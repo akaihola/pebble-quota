@@ -1,0 +1,32 @@
+{
+  "name": "pebble-quota",
+  "author": "Antti Kaihola",
+  "version": "0.1.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "Quota Pace",
+    "uuid": "55cd5be7-0481-48aa-a20e-2edf1d8b713b",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": [
+      "REQUEST_SYNC",
+      "COLLECTED_AT",
+      "ROW_COUNT",
+      "S0", "W0", "U0", "R0", "D0", "P0",
+      "S1", "W1", "U1", "R1", "D1", "P1",
+      "S2", "W2", "U2", "R2", "D2", "P2",
+      "S3", "W3", "U3", "R3", "D3", "P3"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

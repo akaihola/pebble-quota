@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+latest.json
+history/
+watchface/build/
+watchface/.lock-waf*
