@@ -4,6 +4,17 @@
 #define BAR_X 12
 #define BAR_W 176
 
+// Vertical layout for emery (200x228). Regions stack top to bottom.
+#define TIME_BAND_H 56
+#define CAL_TOP TIME_BAND_H
+#define CAL_HEADER_H 14
+#define CAL_GRID_TOP (CAL_TOP + CAL_HEADER_H)
+#define CAL_GRID_H 66            // 3 week rows of 22px
+#define CAL_WEEKS 3
+#define CAL_DAYS 7
+#define PACE_TOP (CAL_GRID_TOP + CAL_GRID_H)
+#define FOOTER_H 15
+
 static Window *s_window;
 static Layer *s_canvas;
 static char s_time[8];
@@ -37,7 +48,91 @@ static GColor pace_color(int pace) {
   return GColorRed;
 }
 
-static void draw_row(GContext *ctx, const QuotaRow *row, int y, time_t now) {
+// ---- Calendar -------------------------------------------------------------
+
+// Copy struct tm out of localtime's static buffer. Anchor at local noon so the
+// +/- day arithmetic never lands on a DST discontinuity (localtime(3)).
+static struct tm relative_day(int days_from_today) {
+  time_t now = time(NULL);
+  struct tm base = *localtime(&now);
+  base.tm_hour = 12;
+  base.tm_min = 0;
+  base.tm_sec = 0;
+  time_t stamp = mktime(&base) + (time_t)days_from_today * 86400;
+  struct tm *result = localtime(&stamp);
+  struct tm out = *result;
+  return out;
+}
+
+// Monday-first column index: Mon->0 .. Sun->6.
+static int monday_index(int tm_wday) {
+  return (tm_wday + 6) % 7;
+}
+
+static void draw_cell_number(GContext *ctx, int mday, GRect cell, GColor color, bool bold) {
+  char buffer[4];
+  snprintf(buffer, sizeof(buffer), "%d", mday);
+  GFont font = fonts_get_system_font(bold ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_18);
+  GSize size = graphics_text_layout_get_content_size(
+      buffer, font, cell, GTextOverflowModeFill, GTextAlignmentCenter);
+  int top = cell.origin.y + (cell.size.h - size.h) / 2;
+  graphics_context_set_text_color(ctx, color);
+  graphics_draw_text(ctx, buffer, font,
+                     GRect(cell.origin.x, top, cell.size.w, size.h + 2),
+                     GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+}
+
+static void draw_calendar(GContext *ctx, int w) {
+  const int cell_w = w / CAL_DAYS;                 // 28
+  const int grid_left = (w - cell_w * CAL_DAYS) / 2;
+  const int cell_h = CAL_GRID_H / CAL_WEEKS;       // 22
+
+  struct tm today = relative_day(0);
+  const int i_today = CAL_DAYS + monday_index(today.tm_wday);  // middle week
+
+  // Weekday header, Monday-first. Weekend letters echo the weekend color.
+  static const char *labels[CAL_DAYS] = {"M", "T", "W", "T", "F", "S", "S"};
+  GFont hfont = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+  for (int c = 0; c < CAL_DAYS; ++c) {
+    graphics_context_set_text_color(ctx, (c >= 5) ? GColorRed : GColorLightGray);
+    graphics_draw_text(ctx, labels[c], hfont,
+                       GRect(grid_left + c * cell_w, CAL_TOP - 1, cell_w, CAL_HEADER_H + 2),
+                       GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+  }
+
+  // Today highlight box.
+  int tcol = i_today % CAL_DAYS;
+  int trow = i_today / CAL_DAYS;
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx,
+      GRect(grid_left + tcol * cell_w, CAL_GRID_TOP + trow * cell_h, cell_w, cell_h),
+      2, GCornersAll);
+
+  for (int i = 0; i < CAL_WEEKS * CAL_DAYS; ++i) {
+    struct tm d = relative_day(i - i_today);
+    bool is_today = (i == i_today);
+    bool weekend = (d.tm_wday == 0 || d.tm_wday == 6);
+    bool other_month = (d.tm_mon != today.tm_mon);
+
+    GColor color;
+    if (is_today) {
+      color = GColorBlack;                                   // on white box
+    } else if (weekend) {
+      color = other_month ? GColorDarkCandyAppleRed : GColorRed;
+    } else {
+      color = other_month ? GColorDarkGray : GColorWhite;
+    }
+
+    int col = i % CAL_DAYS;
+    int row = i / CAL_DAYS;
+    GRect cell = GRect(grid_left + col * cell_w, CAL_GRID_TOP + row * cell_h, cell_w, cell_h);
+    draw_cell_number(ctx, d.tm_mday, cell, color, is_today || weekend);
+  }
+}
+
+// ---- Pace rows ------------------------------------------------------------
+
+static void draw_row(GContext *ctx, const QuotaRow *row, int y, int rh, time_t now) {
   char label[16];
   char value[16];
   int used = clamp_int(row->used, 0, 100);
@@ -46,45 +141,60 @@ static void draw_row(GContext *ctx, const QuotaRow *row, int y, time_t now) {
   snprintf(value, sizeof(value), "%d%% %c%d", 100 - used,
            pace >= 0 ? '+' : '-', abs(pace));
 
+  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
   graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, label, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                     GRect(BAR_X, y, 58, 22), GTextOverflowModeTrailingEllipsis,
-                     GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, value, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                     GRect(70, y, 118, 22), GTextOverflowModeTrailingEllipsis,
-                     GTextAlignmentRight, NULL);
+  graphics_draw_text(ctx, label, font, GRect(BAR_X, y - 1, 70, 16),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+  graphics_draw_text(ctx, value, font, GRect(70, y - 1, BAR_X + BAR_W - 70, 16),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
 
-  int bar_y = y + 22;
+  int bar_h = clamp_int(rh - 17, 4, 8);
+  int bar_y = y + rh - bar_h - 1;
   graphics_context_set_fill_color(ctx, GColorDarkGray);
-  graphics_fill_rect(ctx, GRect(BAR_X, bar_y, BAR_W, 8), 2, GCornersAll);
+  graphics_fill_rect(ctx, GRect(BAR_X, bar_y, BAR_W, bar_h), 2, GCornersAll);
   graphics_context_set_fill_color(ctx, pace_color(row->pace));
-  graphics_fill_rect(ctx, GRect(BAR_X, bar_y, BAR_W * clamp_int(row->used, 0, 100) / 100, 8),
-                     2, GCornersAll);
+  graphics_fill_rect(ctx, GRect(BAR_X, bar_y, BAR_W * used / 100, bar_h), 2, GCornersAll);
 
   int marker_x = BAR_X + BAR_W * elapsed_percent(row, now) / 100;
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_line(ctx, GPoint(marker_x, bar_y - 2), GPoint(marker_x, bar_y + 10));
+  graphics_draw_line(ctx, GPoint(marker_x, bar_y - 2), GPoint(marker_x, bar_y + bar_h + 2));
 }
 
 static void canvas_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
+  int w = bounds.size.w;
+  int h = bounds.size.h;
   time_t now = time(NULL);
 
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, s_time, fonts_get_system_font(FONT_KEY_LECO_32_BOLD_NUMBERS),
-                     GRect(0, 4, bounds.size.w, 42), GTextOverflowModeFill,
+
+  // Large black-on-white time band (Clean Calendar style).
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, GRect(0, 0, w, TIME_BAND_H), 0, GCornerNone);
+  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_draw_text(ctx, s_time, fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS),
+                     GRect(0, 3, w, TIME_BAND_H - 3), GTextOverflowModeFill,
                      GTextAlignmentCenter, NULL);
 
+  // Middle: colored Monday-first three-week calendar.
+  draw_calendar(ctx, w);
+
+  // Bottom: compact pace bars.
+  int region_bottom = h - FOOTER_H;
+  int avail = region_bottom - PACE_TOP;
   if (s_row_count == 0) {
     graphics_context_set_text_color(ctx, GColorLightGray);
-    graphics_draw_text(ctx, "Waiting for quota data", fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-                       GRect(20, 80, bounds.size.w - 40, 60), GTextOverflowModeWordWrap,
-                       GTextAlignmentCenter, NULL);
+    graphics_draw_text(ctx, "Waiting for quota data",
+                       fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+                       GRect(12, PACE_TOP + 8, w - 24, avail - 8),
+                       GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
   } else {
-    for (int i = 0; i < s_row_count; ++i) draw_row(ctx, &s_rows[i], 48 + i * 38, now);
+    int rh = avail / s_row_count;
+    for (int i = 0; i < s_row_count; ++i) {
+      draw_row(ctx, &s_rows[i], PACE_TOP + i * rh, rh, now);
+    }
   }
 
   char footer[32];
@@ -97,7 +207,7 @@ static void canvas_update(Layer *layer, GContext *ctx) {
   }
   graphics_context_set_text_color(ctx, GColorLightGray);
   graphics_draw_text(ctx, footer, fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                     GRect(0, bounds.size.h - 22, bounds.size.w, 18),
+                     GRect(0, h - FOOTER_H, w, FOOTER_H),
                      GTextOverflowModeFill, GTextAlignmentCenter, NULL);
 }
 

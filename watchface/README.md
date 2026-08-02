@@ -2,7 +2,13 @@
 
 Pebble Time 2 (`emery`) watch face for Claude Code and Codex subscription quotas.
 
-Each row shows:
+The layout stacks three regions top to bottom:
+
+1. **Time** — a large black-on-white band at the top (Clean Calendar style).
+2. **Calendar** — a compact colored three-week calendar, Monday-first, ForecasWatch 2 style. Today sits in the middle week inside a white box; weekends are red, adjacent-month days are dimmed.
+3. **Pace bars** — one compact row per quota window squeezed into the bottom.
+
+Each pace row shows:
 
 - service and quota window (`C` = Claude Code, `X` = Codex)
 - percentage remaining and signed pace surplus
@@ -10,6 +16,17 @@ Each row shows:
 - ideal constant-use pace as a white marker
 
 Positive pace means quota is ahead of schedule; negative pace means usage is draining too quickly.
+
+![screenshot](quota-pace.png)
+
+## Calendar date math
+
+The three-week grid is anchored on today: today's Monday-first weekday index
+(`(tm_wday + 6) % 7`) places it in the middle week, and every cell is
+`today ± N` days computed via `mktime` on a local-noon anchor (avoiding DST
+edges). Month/year rollovers and leap days fall out of `mktime`/`localtime`
+naturally; verified against a host-compiled harness for the current date, year
+and month boundaries, a leap day (2028-02-29), and a EU DST-change Sunday.
 
 ## Build on gogo/NixOS
 
