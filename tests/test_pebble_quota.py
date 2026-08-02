@@ -3,7 +3,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import tempfile
+import threading
 import unittest
+import urllib.error
+import urllib.request
 from pathlib import Path
 from unittest import mock
 
@@ -59,7 +62,10 @@ class CompactTests(unittest.TestCase):
 
 class RefreshTests(unittest.TestCase):
     def test_refresh_collects_and_atomically_writes_snapshot(self) -> None:
-        expected = {"collected_at": "1970-01-01T00:00:00Z", "services": {}}
+        expected = {
+            "collected_at": "1970-01-01T00:00:00Z",
+            "services": {"claude": {"windows": {"5h": {"used": 1}}}},
+        }
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "state/latest.json"
             with mock.patch.object(quota, "collect_all", return_value=expected):
@@ -67,6 +73,60 @@ class RefreshTests(unittest.TestCase):
             self.assertEqual(result, expected)
             self.assertEqual(json.loads(output.read_text()), expected)
             self.assertFalse(output.with_suffix(".json.tmp").exists())
+
+    def test_total_failure_preserves_previous_snapshot(self) -> None:
+        previous = {
+            "collected_at": "1970-01-01T00:00:00Z",
+            "services": {"claude": {"windows": {"5h": {"used": 1}}}},
+        }
+        failed = {
+            "collected_at": "1970-01-01T00:05:00Z",
+            "services": {
+                "claude": {"error": "offline"},
+                "codex": {"error": "offline"},
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            output.write_text(json.dumps(previous))
+            with mock.patch.object(quota, "collect_all", return_value=failed):
+                with self.assertRaisesRegex(RuntimeError, "preserving previous"):
+                    quota.refresh_snapshot(output)
+            self.assertEqual(json.loads(output.read_text()), previous)
+
+
+class HttpTests(unittest.TestCase):
+    def test_watch_endpoint_requires_bearer_token(self) -> None:
+        snapshot = {
+            "collected_at": "1970-01-01T00:00:00Z",
+            "services": {"claude": {"windows": {}}},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            output.write_text(json.dumps(snapshot))
+            server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+            server.snapshot = output
+            server.token = "test-secret"
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            url = f"http://127.0.0.1:{server.server_port}/v1/watch"
+            try:
+                with self.assertRaises(urllib.error.HTTPError) as denied:
+                    urllib.request.urlopen(url, timeout=2)
+                self.assertEqual(denied.exception.code, 401)
+                denied.exception.close()
+
+                request = urllib.request.Request(
+                    url,
+                    headers={"Authorization": "Bearer test-secret"},
+                )
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    payload = json.load(response)
+                self.assertEqual(payload["v"], 1)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
 
 
 if __name__ == "__main__":

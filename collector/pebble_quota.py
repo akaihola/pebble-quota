@@ -8,6 +8,7 @@ import json
 import os
 import queue
 import subprocess
+import sys
 import threading
 import time
 import urllib.request
@@ -183,15 +184,27 @@ def write_snapshot(data: dict[str, Any], output: Path) -> None:
     temporary.replace(output)
 
 
+def has_quota_data(data: dict[str, Any]) -> bool:
+    services = data.get("services", {})
+    return any(service.get("windows") for service in services.values())
+
+
 def refresh_snapshot(output: Path) -> dict[str, Any]:
     data = collect_all()
+    if not has_quota_data(data):
+        if output.exists():
+            raise RuntimeError("all quota collectors failed; preserving previous snapshot")
+        raise RuntimeError("all quota collectors failed; no snapshot available")
     write_snapshot(data, output)
     return data
 
 
 def refresh_forever(output: Path, interval_seconds: int, stop: threading.Event) -> None:
     while not stop.wait(interval_seconds):
-        refresh_snapshot(output)
+        try:
+            refresh_snapshot(output)
+        except Exception as error:
+            print(f"quota refresh failed: {error}", file=sys.stderr, flush=True)
 
 
 class QuotaServer(ThreadingHTTPServer):
@@ -246,7 +259,12 @@ def main() -> None:
     if args.refresh_seconds < 1:
         raise SystemExit("--refresh-seconds must be positive")
 
-    refresh_snapshot(args.output)
+    try:
+        refresh_snapshot(args.output)
+    except RuntimeError as error:
+        if not args.output.exists():
+            raise
+        print(f"initial quota refresh failed: {error}", file=sys.stderr, flush=True)
     stop = threading.Event()
     refresher = threading.Thread(
         target=refresh_forever,
