@@ -26,8 +26,11 @@ Response fields are intentionally compact for PebbleKit JS:
 - `r`: reset time as Unix seconds
 - `d`: window duration in seconds
 - `p`: pace surplus in percentage points; positive is ahead, negative is behind
+- `t`: outside temperature in integer tenths of °C (optional; omitted when Home Assistant is unavailable)
 
 Claude collection uses an undocumented OAuth endpoint used by Claude Code itself. Codex collection uses the supported local app-server JSON-RPC method `account/rateLimits/read`.
+
+Outside temperature is a best-effort read of the Home Assistant entity `weather.forecast_koti` (met.no forecast for Koivusyrjä). It uses `HASS_TOKEN` (a Home Assistant long-lived token, kept outside the repo on `gogo`) and `HASS_SERVER` (default `http://localhost:8123`). A Home Assistant outage never blocks quota delivery: the temperature is simply omitted rather than reported as a fabricated value.
 
 ## Watch face
 

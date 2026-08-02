@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -127,6 +128,114 @@ class HttpTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
                 thread.join(timeout=2)
+
+
+class _FakeResponse:
+    def __init__(self, payload: object) -> None:
+        self._body = json.dumps(payload).encode()
+
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+    def read(self, *args: object) -> bytes:
+        return self._body
+
+
+def _urlopen_returning(payload: object):
+    return lambda *args, **kwargs: _FakeResponse(payload)
+
+
+class TemperatureTests(unittest.TestCase):
+    STATE = {"state": "sunny", "attributes": {"temperature": 22.2}}
+
+    def test_reads_temperature_as_tenths(self) -> None:
+        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
+            with mock.patch.object(
+                quota.urllib.request, "urlopen", _urlopen_returning(self.STATE)
+            ):
+                self.assertEqual(quota.collect_temperature(), 222)
+
+    def test_negative_temperature_rounds_to_tenths(self) -> None:
+        state = {"state": "cloudy", "attributes": {"temperature": -5.35}}
+        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
+            with mock.patch.object(
+                quota.urllib.request, "urlopen", _urlopen_returning(state)
+            ):
+                self.assertEqual(quota.collect_temperature(), -54)
+
+    def test_missing_token_returns_none(self) -> None:
+        env = {k: v for k, v in os.environ.items() if k != "HASS_TOKEN"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertIsNone(quota.collect_temperature())
+
+    def test_unavailable_state_returns_none(self) -> None:
+        state = {"state": "unavailable", "attributes": {}}
+        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
+            with mock.patch.object(
+                quota.urllib.request, "urlopen", _urlopen_returning(state)
+            ):
+                self.assertIsNone(quota.collect_temperature())
+
+    def test_malformed_state_missing_attribute_returns_none(self) -> None:
+        state = {"state": "sunny", "attributes": {"humidity": 44}}
+        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
+            with mock.patch.object(
+                quota.urllib.request, "urlopen", _urlopen_returning(state)
+            ):
+                self.assertIsNone(quota.collect_temperature())
+
+    def test_network_error_propagates(self) -> None:
+        def boom(*args: object, **kwargs: object) -> None:
+            raise urllib.error.URLError("connection refused")
+
+        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
+            with mock.patch.object(quota.urllib.request, "urlopen", boom):
+                with self.assertRaises(urllib.error.URLError):
+                    quota.collect_temperature()
+
+
+class CollectAllTemperatureTests(unittest.TestCase):
+    def test_temperature_recorded_when_available(self) -> None:
+        with mock.patch.object(quota, "collect_claude", return_value={"windows": {}}):
+            with mock.patch.object(quota, "collect_codex", return_value={"windows": {}}):
+                with mock.patch.object(quota, "collect_temperature", return_value=222):
+                    data = quota.collect_all()
+        self.assertEqual(data["temperature_c_tenths"], 222)
+        self.assertNotIn("temperature_error", data)
+
+    def test_partial_failure_keeps_quota_and_omits_temperature(self) -> None:
+        claude = {"windows": {"5h": {
+            "used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100,
+        }}}
+
+        def boom() -> int:
+            raise TimeoutError("HA slow")
+
+        with mock.patch.object(quota, "collect_claude", return_value=claude):
+            with mock.patch.object(quota, "collect_codex", return_value={"windows": {}}):
+                with mock.patch.object(quota, "collect_temperature", side_effect=boom):
+                    data = quota.collect_all()
+        # Quota survives the temperature outage.
+        self.assertTrue(quota.has_quota_data(data))
+        self.assertNotIn("temperature_c_tenths", data)
+        self.assertIn("TimeoutError", data["temperature_error"])
+
+    def test_compact_watch_includes_temperature(self) -> None:
+        data = {
+            "collected_at": 0,
+            "temperature_c_tenths": 222,
+            "services": {"claude": {"windows": {"5h": {
+                "used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100,
+            }}}},
+        }
+        self.assertEqual(quota.compact_watch(data, now=950)["t"], 222)
+
+    def test_compact_watch_omits_absent_temperature(self) -> None:
+        data = {"collected_at": 0, "services": {"claude": {"windows": {}}}}
+        self.assertNotIn("t", quota.compact_watch(data, now=0))
 
 
 if __name__ == "__main__":

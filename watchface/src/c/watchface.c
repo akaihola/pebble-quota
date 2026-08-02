@@ -14,6 +14,7 @@
 #define CAL_DAYS 7
 #define PACE_TOP (CAL_GRID_TOP + CAL_GRID_H)
 #define FOOTER_H 15
+#define TEMP_BAND_W 52          // right slice of the time band reserved for temperature
 
 static Window *s_window;
 static Layer *s_canvas;
@@ -31,6 +32,8 @@ typedef struct {
 
 static QuotaRow s_rows[MAX_ROWS];
 static int s_row_count;
+static int s_temp_tenths;   // outside temperature, tenths of degC
+static bool s_has_temp;     // false until the phone sends a temperature
 
 static int clamp_int(int value, int low, int high) {
   return value < low ? low : (value > high ? high : value);
@@ -138,7 +141,8 @@ static void draw_row(GContext *ctx, const QuotaRow *row, int y, int rh, time_t n
   int used = clamp_int(row->used, 0, 100);
   int pace = clamp_int(row->pace, -999, 999);
   snprintf(label, sizeof(label), "%c %.7s", row->service[0], row->window);
-  snprintf(value, sizeof(value), "%d%% %c%d", 100 - used,
+  // Show quota USED (matches the colored bar fill) plus signed pace surplus.
+  snprintf(value, sizeof(value), "%d%% %c%d", used,
            pace >= 0 ? '+' : '-', abs(pace));
 
   GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
@@ -150,15 +154,25 @@ static void draw_row(GContext *ctx, const QuotaRow *row, int y, int rh, time_t n
 
   int bar_h = clamp_int(rh - 17, 4, 8);
   int bar_y = y + rh - bar_h - 1;
-  graphics_context_set_fill_color(ctx, GColorDarkGray);
+  // Remaining quota is a bright gray track; the used portion is a vivid pace color
+  // drawn on top. Bright-gray-vs-saturated-color gives far stronger separation on
+  // the 64-color display than the old dark-gray-on-black track did.
+  graphics_context_set_fill_color(ctx, GColorLightGray);
   graphics_fill_rect(ctx, GRect(BAR_X, bar_y, BAR_W, bar_h), 2, GCornersAll);
   graphics_context_set_fill_color(ctx, pace_color(row->pace));
   graphics_fill_rect(ctx, GRect(BAR_X, bar_y, BAR_W * used / 100, bar_h), 2, GCornersAll);
 
+  // Ideal-pace marker: white core with a black halo so it stays readable over the
+  // light-gray track, over any pace color, and against the black background.
   int marker_x = BAR_X + BAR_W * elapsed_percent(row, now) / 100;
+  GPoint marker_top = GPoint(marker_x, bar_y - 3);
+  GPoint marker_bottom = GPoint(marker_x, bar_y + bar_h + 3);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_stroke_width(ctx, 4);
+  graphics_draw_line(ctx, marker_top, marker_bottom);
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_line(ctx, GPoint(marker_x, bar_y - 2), GPoint(marker_x, bar_y + bar_h + 2));
+  graphics_draw_line(ctx, marker_top, marker_bottom);
 }
 
 static void canvas_update(Layer *layer, GContext *ctx) {
@@ -174,9 +188,22 @@ static void canvas_update(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_rect(ctx, GRect(0, 0, w, TIME_BAND_H), 0, GCornerNone);
   graphics_context_set_text_color(ctx, GColorBlack);
+  // When a temperature is present, centre the time in the left part of the band
+  // and place the reading in the reserved right slice; otherwise use the full
+  // width so absent-temperature layout is unchanged.
+  int time_w = s_has_temp ? w - TEMP_BAND_W : w;
   graphics_draw_text(ctx, s_time, fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS),
-                     GRect(0, 3, w, TIME_BAND_H - 3), GTextOverflowModeFill,
+                     GRect(0, 3, time_w, TIME_BAND_H - 3), GTextOverflowModeFill,
                      GTextAlignmentCenter, NULL);
+  if (s_has_temp) {
+    char temp[8];
+    // Round tenths to whole degrees, away from zero, and show e.g. "22°".
+    int deg = (s_temp_tenths >= 0 ? s_temp_tenths + 5 : s_temp_tenths - 5) / 10;
+    snprintf(temp, sizeof(temp), "%d°", deg);
+    graphics_draw_text(ctx, temp, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD),
+                       GRect(w - TEMP_BAND_W, 13, TEMP_BAND_W - 4, 30),
+                       GTextOverflowModeFill, GTextAlignmentRight, NULL);
+  }
 
   // Middle: colored Monday-first three-week calendar.
   draw_calendar(ctx, w);
@@ -251,6 +278,12 @@ static void inbox_received(DictionaryIterator *iter, void *context) {
     s_rows[i].duration = tuple_int(iter, duration_keys[i], 0);
     s_rows[i].pace = tuple_int(iter, pace_keys[i], 0);
   }
+
+  // Temperature is optional: absent key -> hide it (handled at draw time).
+  Tuple *temp_tuple = dict_find(iter, MESSAGE_KEY_TEMP);
+  s_has_temp = (temp_tuple != NULL);
+  if (s_has_temp) s_temp_tenths = temp_tuple->value->int32;
+
   layer_mark_dirty(s_canvas);
 }
 

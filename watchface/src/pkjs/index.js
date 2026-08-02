@@ -9,6 +9,8 @@ function setting(name, fallback) {
 function sendQuota(data) {
   var rows = (data.q || []).slice(0, 4);
   var message = { COLLECTED_AT: data.at || 0, ROW_COUNT: rows.length };
+  // Outside temperature in tenths of degC; only sent when the collector had it.
+  if (typeof data.t === "number") message["TEMP"] = data.t;
   rows.forEach(function(row, index) {
     message["S" + index] = row.s;
     message["W" + index] = row.w;

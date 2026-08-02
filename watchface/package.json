@@ -20,6 +20,7 @@
       "REQUEST_SYNC",
       "COLLECTED_AT",
       "ROW_COUNT",
+      "TEMP",
       "S0", "W0", "U0", "R0", "D0", "P0",
       "S1", "W1", "U1", "R1", "D1", "P1",
       "S2", "W2", "U2", "R2", "D2", "P2",

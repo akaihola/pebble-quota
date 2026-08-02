@@ -4,18 +4,20 @@ Pebble Time 2 (`emery`) watch face for Claude Code and Codex subscription quotas
 
 The layout stacks three regions top to bottom:
 
-1. **Time** — a large black-on-white band at the top (Clean Calendar style).
+1. **Time** — a large black-on-white band at the top (Clean Calendar style). When
+   the phone provides it, the local outside temperature (e.g. `22°`, read from the
+   Home Assistant `weather.forecast_koti` entity) sits at the right of this band.
 2. **Calendar** — a compact colored three-week calendar, Monday-first, ForecasWatch 2 style. Today sits in the middle week inside a white box; weekends are red, adjacent-month days are dimmed.
 3. **Pace bars** — one compact row per quota window squeezed into the bottom.
 
 Each pace row shows:
 
 - service and quota window (`C` = Claude Code, `X` = Codex)
-- percentage remaining and signed pace surplus
-- consumed quota as a colored bar
-- ideal constant-use pace as a white marker
+- percentage **used** and signed pace surplus
+- consumed quota as a vivid pace-colored bar over a bright light-gray remaining track
+- ideal constant-use pace as a white, black-outlined marker
 
-Positive pace means quota is ahead of schedule; negative pace means usage is draining too quickly.
+Positive pace means quota is ahead of schedule; negative pace means usage is draining too quickly. The colored bar fills with the *used* fraction, so its width matches the displayed used percentage.
 
 ![screenshot](quota-pace.png)
 

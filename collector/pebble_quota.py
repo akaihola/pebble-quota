@@ -19,6 +19,10 @@ from typing import Any, Callable
 
 DURATIONS = {300: "5h", 10_080: "7d"}
 
+# Home Assistant entity for the local Koivusyrjä outside temperature (met.no forecast).
+HASS_TEMPERATURE_ENTITY = "weather.forecast_koti"
+HASS_DEFAULT_SERVER = "http://localhost:8123"
+
 
 def utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -141,6 +145,32 @@ def collect_codex() -> dict[str, Any]:
             proc.kill()
 
 
+def collect_temperature() -> int | None:
+    """Local outside temperature in integer tenths of degC from Home Assistant.
+
+    Returns None (rather than a fabricated value) whenever the reading cannot be
+    trusted: no HA token configured, the entity is unknown/unavailable, or the
+    temperature attribute is missing. Network/HTTP/JSON failures raise so the
+    caller can record the error while still delivering quota data.
+    """
+    token = os.environ.get("HASS_TOKEN")
+    if not token:
+        return None
+    server = os.environ.get("HASS_SERVER", HASS_DEFAULT_SERVER).rstrip("/")
+    request = urllib.request.Request(
+        f"{server}/api/states/{HASS_TEMPERATURE_ENTITY}",
+        headers={"Authorization": f"Bearer {token}", "User-Agent": "pebble-quota/0.1"},
+    )
+    with urllib.request.urlopen(request, timeout=5) as response:
+        state = json.load(response)
+    if state.get("state") in (None, "unknown", "unavailable"):
+        return None
+    value = state.get("attributes", {}).get("temperature")
+    if value is None:
+        return None
+    return round(float(value) * 10)
+
+
 def collect_all() -> dict[str, Any]:
     output: dict[str, Any] = {"collected_at": utc_iso(), "services": {}}
     collectors: tuple[tuple[str, Callable[[], dict[str, Any]]], ...] = (
@@ -151,6 +181,15 @@ def collect_all() -> dict[str, Any]:
             output["services"][name] = collector()
         except Exception as exc:
             output["services"][name] = {"service": name, "error": f"{type(exc).__name__}: {exc}"}
+    # Outside temperature is best-effort: a Home Assistant outage must never block
+    # quota delivery, so record the error and omit the value rather than raise.
+    try:
+        tenths = collect_temperature()
+    except Exception as exc:
+        output["temperature_error"] = f"{type(exc).__name__}: {exc}"
+    else:
+        if tenths is not None:
+            output["temperature_c_tenths"] = tenths
     return output
 
 
@@ -174,7 +213,11 @@ def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any
                 "d": duration,
                 "p": pace_points(used, reset, duration, now),
             })
-    return {"v": 1, "at": epoch(data.get("collected_at")), "q": rows}
+    result: dict[str, Any] = {"v": 1, "at": epoch(data.get("collected_at")), "q": rows}
+    tenths = data.get("temperature_c_tenths")
+    if isinstance(tenths, int):
+        result["t"] = tenths  # outside temperature, integer tenths of degC
+    return result
 
 
 def write_snapshot(data: dict[str, Any], output: Path) -> None:
