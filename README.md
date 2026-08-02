@@ -52,4 +52,10 @@ python3 -m unittest discover -s tests -v
 
 ## Status
 
-The live collector, authenticated endpoint, PebbleKit JS transport, Emery watch face, and headless-emulator path are working. Android deployment still needs a reachable URL for `gogo` and a real bearer token.
+The collector runs continuously on `gogo` as `pebble-quota.service`, refreshing quota data every five minutes. Its loopback API is exposed privately to the tailnet at:
+
+```text
+https://gogo.crane-boa.ts.net:8450/v1/watch
+```
+
+The authenticated endpoint, PebbleKit JS transport, Emery watch face, and headless-emulator path are working. Physical Android/Pebble deployment still needs a configuration flow that stores this endpoint and the service token in PebbleKit JS local storage without committing the token.
