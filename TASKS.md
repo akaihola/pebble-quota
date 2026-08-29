@@ -4,7 +4,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [*] Fix Codex 1% showing as 100%
+- [1] Fix Codex 1% showing as 100%
 
 ## In progress
 
@@ -12,6 +12,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 ## Completed
 
 [*]: TASKS.md
+[1]: docs/tasks/1-fix-codex-one-percent.md
 
 ---
 
@@ -33,7 +34,7 @@ Here are the rules for TASKS.md usage:
 
 - Ensure dependencies between issues are correctly updated.
 - State dependencies using
-  - indented `- Depends on: [NNN]` bullets in TASKS.md, and
+  - indented `- Depends on: [N]` bullets in TASKS.md, and
   - YAML frontmatter in description files.
 - Ensure backlog order respects dependencies.
 
@@ -42,7 +43,7 @@ Here are the rules for TASKS.md usage:
 - Pick the first backlog issue with no dependency to any uncompleted issue.
 - Move it to `In progress` in `main` branch.
 - Create or update, review and refine a plan in
-  docs/tasks/<NNN-issue-description>.md in `main` (skip for `[*]` items).
+  docs/tasks/<N-issue-description>.md in `main` (skip for `[*]` items).
 - Commit description file (if any) and TASKS.md in `main`.
 - From now on, ensure worktree feature branch is always rebased on `main`.
 - Implement the plan, and lint, test, review and refine the implementation in
