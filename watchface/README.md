@@ -72,11 +72,15 @@ the values on the phone and triggers an immediate sync.
 
 ## Phone-side endpoint
 
-During emulator development, `src/pkjs/index.js` defaults to:
+`src/pkjs/index.js` defaults to the production collector over the tailnet:
 
 ```text
-http://127.0.0.1:8765/v1/watch
+https://gogo.crane-boa.ts.net:8450/v1/watch
 test-only-token
 ```
 
-These defaults must be replaced or configured before installing on Android. The collector accepts the token in the `Authorization: Bearer` header; Claude/OpenAI credentials remain on `gogo`.
+The endpoint default is already correct for a physical phone on the tailnet —
+only the real token is still missing after a fresh install. Enter it (and, if
+ever needed, a different endpoint) in the face's **Settings** in the Pebble
+phone app, as described above. The collector accepts the token in the
+`Authorization: Bearer` header; Claude/OpenAI credentials remain on `gogo`.

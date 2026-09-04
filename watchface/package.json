@@ -12,6 +12,9 @@
     "uuid": "55cd5be7-0481-48aa-a20e-2edf1d8b713b",
     "sdkVersion": "3",
     "enableMultiJS": true,
+    "capabilities": [
+      "configurable"
+    ],
     "targetPlatforms": [
       "emery"
     ],
