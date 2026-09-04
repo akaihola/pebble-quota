@@ -59,16 +59,13 @@ The tested emulator path on headless NixOS is documented in [`watchface/README.m
 
 ### Releasing
 
-Bump `version` in `watchface/package.json`, commit it, then push a matching tag:
+Release Please maintains a release PR with the next `major.minor.0` version in
+`watchface/package.json`. Merge that PR to release. CI builds the watchface,
+creates the matching `vX.Y.0` tag and GitHub release, and uploads the `.pbw`.
 
-```bash
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-GitHub Actions builds the watchface on pushes to `main`, version tags, and pull
-requests targeting `main`. A matching version tag also publishes the `.pbw` on
-GitHub Releases.
+Set the `RELEASE_PLEASE_TOKEN` repository secret to a fine-grained personal
+access token with Contents, Issues, and Pull requests read/write access so CI
+also runs on the generated release PR.
 
 ## Tests
 
