@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 DURATIONS = {300: "5h", 10_080: "7d"}
 
@@ -303,10 +304,53 @@ class QuotaServer(ThreadingHTTPServer):
     token: str
 
 
+# Settings page for the Pebble phone app (Clay-style config, no dependency):
+# plain form, Save closes the webview with the values as JSON. Served without
+# auth so a fresh install can be pointed at the endpoint before it has a token.
+CONFIG_PAGE = """<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quota Pace settings</title>
+<style>body{font-family:sans-serif;margin:1em}label{display:block;margin:0 0 1em}
+input{width:100%;box-sizing:border-box;font-size:1em;margin-top:.25em}
+button{font-size:1.1em;padding:.5em 1.5em}</style></head>
+<body>
+<label>Endpoint<input id="endpoint" type="url" autocapitalize="off"></label>
+<label>Token<input id="token" type="text" autocapitalize="off" autocomplete="off"></label>
+<button id="save">Save</button>
+<script>
+var q = {};
+location.search.slice(1).split("&").forEach(function (pair) {
+  var kv = pair.split("=");
+  if (kv[0]) q[kv[0]] = decodeURIComponent(kv[1] || "");
+});
+document.getElementById("endpoint").value = q.endpoint || "";
+document.getElementById("token").value = q.token || "";
+document.getElementById("save").addEventListener("click", function () {
+  var settings = {
+    endpoint: document.getElementById("endpoint").value,
+    token: document.getElementById("token").value,
+  };
+  document.location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(settings));
+});
+</script></body></html>
+"""
+
+
 def make_handler() -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
-            if self.path != "/v1/watch":
+            path = urlsplit(self.path).path
+            if path == "/config":
+                body = CONFIG_PAGE.encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if path != "/v1/watch":
                 self.send_error(404)
                 return
             expected = f"Bearer {self.server.token}"  # type: ignore[attr-defined]

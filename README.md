@@ -18,6 +18,13 @@ GET /v1/watch
 Authorization: Bearer <token>
 ```
 
+Settings page for the Pebble phone app (no auth — a fresh install has no
+token yet):
+
+```text
+GET /config
+```
+
 Response fields are intentionally compact for PebbleKit JS:
 
 - `s`: `C` for Claude Code, `X` for Codex

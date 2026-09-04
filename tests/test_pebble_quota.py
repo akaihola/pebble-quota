@@ -110,6 +110,27 @@ class RefreshTests(unittest.TestCase):
 
 
 class HttpTests(unittest.TestCase):
+    def test_config_page_served_without_auth(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            output.write_text("{}")
+            server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+            server.snapshot = output
+            server.token = "test-secret"
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            url = f"http://127.0.0.1:{server.server_port}/config?endpoint=e&token=t"
+            try:
+                with urllib.request.urlopen(url, timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertIn("text/html", response.headers.get("Content-Type", ""))
+                    body = response.read().decode()
+                self.assertIn("pebblejs://close#", body)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+
     def test_watch_endpoint_requires_bearer_token(self) -> None:
         snapshot = {
             "collected_at": "1970-01-01T00:00:00Z",
@@ -137,6 +158,13 @@ class HttpTests(unittest.TestCase):
                 with urllib.request.urlopen(request, timeout=2) as response:
                     payload = json.load(response)
                 self.assertEqual(payload["v"], 1)
+
+                with self.assertRaises(urllib.error.HTTPError) as unknown:
+                    urllib.request.urlopen(
+                        f"http://127.0.0.1:{server.server_port}/nope", timeout=2
+                    )
+                self.assertEqual(unknown.exception.code, 404)
+                unknown.exception.close()
             finally:
                 server.shutdown()
                 server.server_close()

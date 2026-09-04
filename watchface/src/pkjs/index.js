@@ -55,6 +55,29 @@ function refresh() {
   request.send();
 }
 
+function configUrl() {
+  var endpoint = setting("endpoint", DEFAULT_ENDPOINT);
+  var base = endpoint.replace(/\/v1\/watch\/?$/, "");
+  return base + "/config?endpoint=" + encodeURIComponent(endpoint)
+    + "&token=" + encodeURIComponent(setting("token", DEFAULT_TOKEN));
+}
+
+Pebble.addEventListener("showConfiguration", function () {
+  Pebble.openURL(configUrl());
+});
+
+Pebble.addEventListener("webviewclosed", function (event) {
+  if (!event.response) return;
+  try {
+    var settings = JSON.parse(decodeURIComponent(event.response));
+    if (settings.endpoint) localStorage.setItem("endpoint", settings.endpoint);
+    if (settings.token) localStorage.setItem("token", settings.token);
+    refresh();
+  } catch (error) {
+    console.log("Invalid settings JSON: " + error);
+  }
+});
+
 Pebble.addEventListener("ready", function () {
   refresh();
   setInterval(refresh, REFRESH_MS);

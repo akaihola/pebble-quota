@@ -64,9 +64,11 @@ Alternative: enable the developer connection in the phone app, then run
 `pebble install --phone <phone-ip>` from this directory.
 
 The JS side already points at the production collector endpoint; only the token
-ships as `test-only-token` (overridable via `localStorage`). There is no
-settings UI for it yet, so whatever token setup the current install uses
-carries over unchanged.
+ships as `test-only-token`. After installing, open the face's **Settings** in
+the Pebble phone app (the gear icon on the installed face) and enter the real
+endpoint and token — the settings page is served by the collector itself at
+`<endpoint>/config`, so it is always reachable from the phone. Saving stores
+the values on the phone and triggers an immediate sync.
 
 ## Phone-side endpoint
 
