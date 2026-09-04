@@ -34,7 +34,10 @@ Outside temperature is a best-effort read of the Home Assistant entity `weather.
 
 ## Watch face
 
-The v1 face targets Pebble Time 2 (`emery`). Build it with:
+The v1 face targets Pebble Time 2 (`emery`). Download the installable `.pbw`
+from the [latest GitHub release](https://github.com/akaihola/pebble-quota/releases/latest).
+
+To build it locally:
 
 ```bash
 cd watchface
@@ -46,6 +49,19 @@ The generated installable bundle is `watchface/build/watchface.pbw`.
 ![Pebble Time 2 emulator showing live quota pace](watchface/quota-pace.png)
 
 The tested emulator path on headless NixOS is documented in [`watchface/README.md`](watchface/README.md).
+
+### Releasing
+
+Bump `version` in `watchface/package.json`, commit it, then push a matching tag:
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+GitHub Actions builds the watchface on pushes to `main`, version tags, and pull
+requests targeting `main`. A matching version tag also publishes the `.pbw` on
+GitHub Releases.
 
 ## Tests
 
