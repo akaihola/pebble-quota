@@ -58,6 +58,49 @@ def pace_points(used_fraction: float, resets_at: int, duration_seconds: int, now
     return round((elapsed_fraction - used_fraction) * 100)
 
 
+# limits[] kinds in the Anthropic usage payload, and the window each maps to. A
+# weekly_scoped entry carries a per-model scope (e.g. Fable); its key keeps the
+# model name so compact_watch can route it to its own gauge row.
+CLAUDE_LIMIT_WINDOWS = {
+    "session": ("5h", 18_000),
+    "weekly_all": ("7d", 604_800),
+}
+CLAUDE_SCOPED_DURATION = 604_800
+
+
+def claude_windows_from_limits(limits: Any) -> dict[str, Any]:
+    """The usable windows in a limits[] payload, keyed like the legacy pair.
+
+    Entries with no percent or no resets_at are dropped: a window with no end
+    cannot be placed on a burn line. Unknown kinds are skipped.
+    """
+    windows: dict[str, Any] = {}
+    for limit in limits or []:
+        if not isinstance(limit, dict):
+            continue
+        percent = limit.get("percent")
+        resets_at = limit.get("resets_at")
+        if percent is None or not resets_at:
+            continue
+        kind = limit.get("kind")
+        if kind in CLAUDE_LIMIT_WINDOWS:
+            name, seconds = CLAUDE_LIMIT_WINDOWS[kind]
+        elif kind == "weekly_scoped":
+            scope = (limit.get("scope") or {}).get("model") or {}
+            name, seconds = (
+                f"7d ({scope.get('display_name') or 'model'})",
+                CLAUDE_SCOPED_DURATION,
+            )
+        else:
+            continue
+        windows[name] = {
+            "used_fraction": fraction(percent),
+            "resets_at": resets_at,
+            "duration_seconds": seconds,
+        }
+    return windows
+
+
 def collect_claude() -> dict[str, Any]:
     credentials = json.loads((Path.home() / ".claude/.credentials.json").read_text())
     token = credentials.get("claudeAiOauth", {}).get("accessToken")
@@ -73,6 +116,8 @@ def collect_claude() -> dict[str, Any]:
     )
     with urllib.request.urlopen(request, timeout=15) as response:
         raw = json.load(response)
+    if windows := claude_windows_from_limits(raw.get("limits")):
+        return {"service": "claude", "windows": windows}
     windows = {}
     for source, name, seconds in (
         ("five_hour", "5h", 18_000),
@@ -205,9 +250,12 @@ def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any
             duration = item.get("duration_seconds")
             if used is None or reset is None or not duration:
                 continue
+            code, name = service_codes[service_name], window_name
+            if service_name == "claude" and window_name == "7d (Fable)":
+                code, name = "F", "7d"
             rows.append({
-                "s": service_codes[service_name],
-                "w": window_name,
+                "s": code,
+                "w": name,
                 "u": round(used * 100),
                 "r": reset,
                 "d": duration,

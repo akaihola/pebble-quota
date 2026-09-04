@@ -9,7 +9,7 @@ function setting(name, fallback) {
 }
 
 function sendQuota(data) {
-  var rows = (data.q || []).slice(0, 4);
+  var rows = (data.q || []).slice(0, 5);
   var message = { COLLECTED_AT: data.at || 0, ROW_COUNT: rows.length };
   // Outside temperature in tenths of degC; only sent when the collector had it.
   if (typeof data.t === "number") message["TEMP"] = data.t;

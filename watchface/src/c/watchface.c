@@ -1,6 +1,7 @@
 #include <pebble.h>
+#include <string.h>
 
-#define MAX_ROWS 4
+#define MAX_ROWS 5
 #define BAR_X 12
 #define BAR_W 176
 
@@ -13,7 +14,6 @@
 #define CAL_WEEKS 3
 #define CAL_DAYS 7
 #define PACE_TOP (CAL_GRID_TOP + CAL_GRID_H)
-#define FOOTER_H 15
 #define TEMP_BAND_W 52          // right slice of the time band reserved for temperature
 
 static Window *s_window;
@@ -135,44 +135,92 @@ static void draw_calendar(GContext *ctx, int w) {
 
 // ---- Pace rows ------------------------------------------------------------
 
-static void draw_row(GContext *ctx, const QuotaRow *row, int y, int rh, time_t now) {
-  char label[16];
-  char value[16];
-  int used = clamp_int(row->used, 0, 100);
-  int pace = clamp_int(row->pace, -999, 999);
-  snprintf(label, sizeof(label), "%c %.7s", row->service[0], row->window);
-  // Show quota USED (matches the colored bar fill) plus signed pace surplus.
-  snprintf(value, sizeof(value), "%d%% %c%d", used,
-           pace >= 0 ? '+' : '-', abs(pace));
+static int find_row(char service, const char *window) {
+  for (int i = 0; i < s_row_count; ++i) {
+    if (s_rows[i].service[0] == service && strcmp(s_rows[i].window, window) == 0) return i;
+  }
+  return -1;
+}
 
-  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
-  graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, label, font, GRect(BAR_X, y - 1, 70, 16),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, value, font, GRect(70, y - 1, BAR_X + BAR_W - 70, 16),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
+static void gauge_title(char service, const char *window, char *out, size_t size) {
+  const char *name = NULL;
+  if (service == 'C') name = "Claude";
+  else if (service == 'F') name = "Fable";
+  else if (service == 'X') name = "Codex";
+  if (name) snprintf(out, size, "%s %s", name, window);
+  else snprintf(out, size, "%c %s", service, window);
+}
 
-  int bar_h = clamp_int(rh - 17, 4, 8);
-  int bar_y = y + rh - bar_h - 1;
+static void draw_bar_fill(GContext *ctx, int used, int pace, int x, int y, int w, int h) {
   // Remaining quota is a bright gray track; the used portion is a vivid pace color
   // drawn on top. Bright-gray-vs-saturated-color gives far stronger separation on
   // the 64-color display than the old dark-gray-on-black track did.
   graphics_context_set_fill_color(ctx, GColorLightGray);
-  graphics_fill_rect(ctx, GRect(BAR_X, bar_y, BAR_W, bar_h), 2, GCornersAll);
-  graphics_context_set_fill_color(ctx, pace_color(row->pace));
-  graphics_fill_rect(ctx, GRect(BAR_X, bar_y, BAR_W * used / 100, bar_h), 2, GCornersAll);
+  graphics_fill_rect(ctx, GRect(x, y, w, h), 2, GCornersAll);
+  graphics_context_set_fill_color(ctx, pace_color(pace));
+  graphics_fill_rect(ctx, GRect(x, y, w * used / 100, h), 2, GCornersAll);
+}
 
+static void draw_marker(GContext *ctx, int x, int top, int bottom) {
   // Ideal-pace marker: white core with a black halo so it stays readable over the
   // light-gray track, over any pace color, and against the black background.
-  int marker_x = BAR_X + BAR_W * elapsed_percent(row, now) / 100;
-  GPoint marker_top = GPoint(marker_x, bar_y - 3);
-  GPoint marker_bottom = GPoint(marker_x, bar_y + bar_h + 3);
+  GPoint marker_top = GPoint(x, top);
+  GPoint marker_bottom = GPoint(x, bottom);
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 4);
   graphics_draw_line(ctx, marker_top, marker_bottom);
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_stroke_width(ctx, 2);
   graphics_draw_line(ctx, marker_top, marker_bottom);
+}
+
+static void draw_gauge_label(GContext *ctx, const char *title, const char *status, int y) {
+  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+  int status_w = 0;
+  if (status) {
+    // Sync status shares the title row, right-aligned; the title gets
+    // whatever width is left, with an ellipsis if it ever collides.
+    GSize size = graphics_text_layout_get_content_size(status, font,
+        GRect(BAR_X, y - 1, BAR_W, 16), GTextOverflowModeFill, GTextAlignmentLeft);
+    status_w = size.w + 6;
+    graphics_context_set_text_color(ctx, GColorLightGray);
+    graphics_draw_text(ctx, status, font, GRect(BAR_X, y - 1, BAR_W, 16),
+                       GTextOverflowModeFill, GTextAlignmentRight, NULL);
+  }
+  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_draw_text(ctx, title, font, GRect(BAR_X, y - 1, BAR_W - status_w, 16),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+}
+
+static void draw_single_gauge(GContext *ctx, const QuotaRow *row, const char *title,
+                              const char *status, int y, int rh, time_t now) {
+  draw_gauge_label(ctx, title, status, y);
+
+  int bar_h = clamp_int(rh - 17, 4, 10);
+  int bar_y = y + rh - bar_h - 1;
+  // The colored bar fills with the *used* fraction.
+  draw_bar_fill(ctx, clamp_int(row->used, 0, 100), row->pace, BAR_X, bar_y, BAR_W, bar_h);
+
+  int marker_x = BAR_X + BAR_W * elapsed_percent(row, now) / 100;
+  draw_marker(ctx, marker_x, bar_y - 3, bar_y + bar_h + 3);
+}
+
+static void draw_combined_gauge(GContext *ctx, const QuotaRow *first, const QuotaRow *second,
+                                const char *title, const char *status, int y, int rh, time_t now) {
+  draw_gauge_label(ctx, title, status, y);
+
+  // Two color bars share one gauge with a 1px gap; one window marker spans both
+  // because both windows reset together.
+  int bar_h = clamp_int((rh - 17 - 1) / 2, 3, 10);
+  int first_y = y + rh - 2 * bar_h - 2;
+  int second_y = first_y + bar_h + 1;
+  draw_bar_fill(ctx, clamp_int(first->used, 0, 100), first->pace,
+                BAR_X, first_y, BAR_W, bar_h);
+  draw_bar_fill(ctx, clamp_int(second->used, 0, 100), second->pace,
+                BAR_X, second_y, BAR_W, bar_h);
+
+  int marker_x = BAR_X + BAR_W * elapsed_percent(first, now) / 100;
+  draw_marker(ctx, marker_x, first_y - 2, second_y + bar_h + 2);
 }
 
 static void canvas_update(Layer *layer, GContext *ctx) {
@@ -208,9 +256,18 @@ static void canvas_update(Layer *layer, GContext *ctx) {
   // Middle: colored Monday-first three-week calendar.
   draw_calendar(ctx, w);
 
-  // Bottom: compact pace bars.
-  int region_bottom = h - FOOTER_H;
+  // Bottom: compact pace bars. The sync status rides on the first gauge's
+  // title row, right-aligned, so four gauges fit with no footer.
+  int region_bottom = h;
   int avail = region_bottom - PACE_TOP;
+  char status[32];
+  if (s_collected_at > 0) {
+    int age_minutes = (int)(now - s_collected_at) / 60;
+    if (age_minutes < 0) age_minutes = 0;
+    snprintf(status, sizeof(status), "updated %dm ago", age_minutes);
+  } else {
+    snprintf(status, sizeof(status), "phone sync pending");
+  }
   if (s_row_count == 0) {
     graphics_context_set_text_color(ctx, GColorLightGray);
     graphics_draw_text(ctx, "Waiting for quota data",
@@ -218,24 +275,28 @@ static void canvas_update(Layer *layer, GContext *ctx) {
                        GRect(12, PACE_TOP + 8, w - 24, avail - 8),
                        GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
   } else {
-    int rh = avail / s_row_count;
-    for (int i = 0; i < s_row_count; ++i) {
-      draw_row(ctx, &s_rows[i], PACE_TOP + i * rh, rh, now);
+    // The Claude 7d and Fable 7d rows share one gauge: two color bars with one
+    // window marker, since both windows reset together.
+    int claude_7d = find_row('C', "7d");
+    int fable_7d = find_row('F', "7d");
+    bool paired = claude_7d >= 0 && fable_7d >= 0;
+    int rh = avail / (s_row_count - (paired ? 1 : 0));
+    char title[24];
+    for (int i = 0, gi = 0; i < s_row_count; ++i) {
+      if (paired && i == fable_7d) continue;
+      if (paired && i == claude_7d) {
+        draw_combined_gauge(ctx, &s_rows[claude_7d], &s_rows[fable_7d],
+                            "Claude+Fable 7d", gi == 0 ? status : NULL,
+                            PACE_TOP + gi * rh, rh, now);
+      } else {
+        gauge_title(s_rows[i].service[0], s_rows[i].window, title, sizeof(title));
+        draw_single_gauge(ctx, &s_rows[i], title, gi == 0 ? status : NULL,
+                          PACE_TOP + gi * rh, rh, now);
+      }
+      ++gi;
     }
   }
 
-  char footer[32];
-  if (s_collected_at > 0) {
-    int age_minutes = (int)(now - s_collected_at) / 60;
-    if (age_minutes < 0) age_minutes = 0;
-    snprintf(footer, sizeof(footer), "updated %dm ago", age_minutes);
-  } else {
-    snprintf(footer, sizeof(footer), "phone sync pending");
-  }
-  graphics_context_set_text_color(ctx, GColorLightGray);
-  graphics_draw_text(ctx, footer, fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                     GRect(0, h - FOOTER_H, w, FOOTER_H),
-                     GTextOverflowModeFill, GTextAlignmentCenter, NULL);
 }
 
 static void update_time(void) {
@@ -263,12 +324,12 @@ static void inbox_received(DictionaryIterator *iter, void *context) {
   s_collected_at = tuple_int(iter, MESSAGE_KEY_COLLECTED_AT, s_collected_at);
   s_row_count = clamp_int(tuple_int(iter, MESSAGE_KEY_ROW_COUNT, 0), 0, MAX_ROWS);
 
-  const uint32_t service_keys[] = {MESSAGE_KEY_S0, MESSAGE_KEY_S1, MESSAGE_KEY_S2, MESSAGE_KEY_S3};
-  const uint32_t window_keys[] = {MESSAGE_KEY_W0, MESSAGE_KEY_W1, MESSAGE_KEY_W2, MESSAGE_KEY_W3};
-  const uint32_t used_keys[] = {MESSAGE_KEY_U0, MESSAGE_KEY_U1, MESSAGE_KEY_U2, MESSAGE_KEY_U3};
-  const uint32_t reset_keys[] = {MESSAGE_KEY_R0, MESSAGE_KEY_R1, MESSAGE_KEY_R2, MESSAGE_KEY_R3};
-  const uint32_t duration_keys[] = {MESSAGE_KEY_D0, MESSAGE_KEY_D1, MESSAGE_KEY_D2, MESSAGE_KEY_D3};
-  const uint32_t pace_keys[] = {MESSAGE_KEY_P0, MESSAGE_KEY_P1, MESSAGE_KEY_P2, MESSAGE_KEY_P3};
+  const uint32_t service_keys[] = {MESSAGE_KEY_S0, MESSAGE_KEY_S1, MESSAGE_KEY_S2, MESSAGE_KEY_S3, MESSAGE_KEY_S4};
+  const uint32_t window_keys[] = {MESSAGE_KEY_W0, MESSAGE_KEY_W1, MESSAGE_KEY_W2, MESSAGE_KEY_W3, MESSAGE_KEY_W4};
+  const uint32_t used_keys[] = {MESSAGE_KEY_U0, MESSAGE_KEY_U1, MESSAGE_KEY_U2, MESSAGE_KEY_U3, MESSAGE_KEY_U4};
+  const uint32_t reset_keys[] = {MESSAGE_KEY_R0, MESSAGE_KEY_R1, MESSAGE_KEY_R2, MESSAGE_KEY_R3, MESSAGE_KEY_R4};
+  const uint32_t duration_keys[] = {MESSAGE_KEY_D0, MESSAGE_KEY_D1, MESSAGE_KEY_D2, MESSAGE_KEY_D3, MESSAGE_KEY_D4};
+  const uint32_t pace_keys[] = {MESSAGE_KEY_P0, MESSAGE_KEY_P1, MESSAGE_KEY_P2, MESSAGE_KEY_P3, MESSAGE_KEY_P4};
 
   for (int i = 0; i < s_row_count; ++i) {
     tuple_string(iter, service_keys[i], s_rows[i].service, sizeof(s_rows[i].service));

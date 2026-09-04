@@ -8,16 +8,20 @@ The layout stacks three regions top to bottom:
    the phone provides it, the local outside temperature (e.g. `22°`, read from the
    Home Assistant `weather.forecast_koti` entity) sits at the right of this band.
 2. **Calendar** — a compact colored three-week calendar, Monday-first, ForecasWatch 2 style. Today sits in the middle week inside a white box; weekends are red, adjacent-month days are dimmed.
-3. **Pace bars** — one compact row per quota window squeezed into the bottom.
+3. **Pace bars** — one compact gauge per quota window squeezed into the bottom:
+   `Claude 5h`, the combined `Claude+Fable 7d`, `Codex 5h`, `Codex 7d`.
 
-Each pace row shows:
+Each pace gauge shows:
 
-- service and quota window (`C` = Claude Code, `X` = Codex)
-- percentage **used** and signed pace surplus
+- service and quota window title, with the sync status (`updated Nm ago`,
+  `phone sync pending`) right-aligned on the first gauge's title row
 - consumed quota as a vivid pace-colored bar over a bright light-gray remaining track
 - ideal constant-use pace as a white, black-outlined marker
 
-Positive pace means quota is ahead of schedule; negative pace means usage is draining too quickly. The colored bar fills with the *used* fraction, so its width matches the displayed used percentage.
+The Claude 7d and Fable 7d windows share one `Claude+Fable 7d` gauge: two color
+bars 1px apart, one per window, with a single window marker spanning both (both
+windows reset together). Pace color still carries the surplus state per bar:
+green ahead of schedule, yellow slightly behind, red draining too quickly.
 
 ![screenshot](quota-pace.png)
 
@@ -51,6 +55,18 @@ The QEMU emulator needs a temporary X display and a Nix library closure on headl
 ```bash
 nix-shell --run 'xvfb-run -a sh -c "pebble install --emulator emery && sleep 3 && pebble screenshot --emulator emery quota-pace.png && pebble kill"'
 ```
+
+## Install on a physical Pebble
+
+Copy `build/watchface.pbw` to the phone (USB, Syncthing, or any download) and
+open it with the Pebble app — it sideloads over the installed face in place.
+Alternative: enable the developer connection in the phone app, then run
+`pebble install --phone <phone-ip>` from this directory.
+
+The JS side already points at the production collector endpoint; only the token
+ships as `test-only-token` (overridable via `localStorage`). There is no
+settings UI for it yet, so whatever token setup the current install uses
+carries over unchanged.
 
 ## Phone-side endpoint
 

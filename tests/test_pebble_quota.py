@@ -60,6 +60,19 @@ class CompactTests(unittest.TestCase):
         }}}}
         self.assertEqual(quota.compact_watch(data, now=0)["q"], [])
 
+    def test_routes_fable_window_to_its_own_row(self) -> None:
+        data = {"collected_at": 0, "services": {"claude": {"windows": {
+            "5h": {"used_fraction": 0.05, "resets_at": 1000, "duration_seconds": 100},
+            "7d": {"used_fraction": 0.4, "resets_at": 1000, "duration_seconds": 100},
+            "7d (Fable)": {
+                "used_fraction": 0.55, "resets_at": 1000, "duration_seconds": 100,
+            },
+        }}}}
+        rows = quota.compact_watch(data, now=950)["q"]
+        self.assertEqual([(row["s"], row["w"]) for row in rows],
+                         [("C", "5h"), ("C", "7d"), ("F", "7d")])
+        self.assertEqual([row["u"] for row in rows], [5, 40, 55])
+
 
 class RefreshTests(unittest.TestCase):
     def test_refresh_collects_and_atomically_writes_snapshot(self) -> None:
@@ -236,6 +249,57 @@ class CollectAllTemperatureTests(unittest.TestCase):
     def test_compact_watch_omits_absent_temperature(self) -> None:
         data = {"collected_at": 0, "services": {"claude": {"windows": {}}}}
         self.assertNotIn("t", quota.compact_watch(data, now=0))
+
+
+class ClaudeCollectTests(unittest.TestCase):
+    LIMITS = [
+        {"kind": "session", "percent": 5,
+         "resets_at": "2026-08-03T22:59:59+00:00", "scope": None},
+        {"kind": "weekly_all", "percent": 40,
+         "resets_at": "2026-08-10T12:59:59+00:00", "scope": None},
+        {"kind": "weekly_scoped", "percent": 55,
+         "resets_at": "2026-08-10T12:59:59+00:00",
+         "scope": {"model": {"display_name": "Fable"}}},
+    ]
+
+    def _collect(self, payload: object) -> dict:
+        with tempfile.TemporaryDirectory() as home:
+            credentials = home + "/.claude/.credentials.json"
+            Path(home, ".claude").mkdir(parents=True)
+            Path(credentials).write_text(json.dumps(
+                {"claudeAiOauth": {"accessToken": "test-token"}}))
+            with mock.patch.dict(os.environ, {"HOME": home}):
+                with mock.patch.object(
+                    quota.urllib.request, "urlopen", _urlopen_returning(payload)
+                ):
+                    return quota.collect_claude()
+
+    def test_limits_are_preferred_and_include_fable(self) -> None:
+        result = self._collect({
+            "five_hour": {"utilization": 1.0, "resets_at": "2026-08-03T22:00:00+00:00"},
+            "seven_day": {"utilization": 2.0, "resets_at": "2026-08-10T12:00:00+00:00"},
+            "limits": self.LIMITS,
+        })
+        self.assertEqual(list(result["windows"]), ["5h", "7d", "7d (Fable)"])
+        self.assertEqual(result["windows"]["7d (Fable)"]["used_fraction"], 0.55)
+        self.assertEqual(
+            result["windows"]["7d (Fable)"]["duration_seconds"], 604_800)
+
+    def test_legacy_pair_is_the_fallback(self) -> None:
+        result = self._collect({
+            "five_hour": {"utilization": 5.0, "resets_at": "2026-08-03T22:00:00+00:00"},
+            "seven_day": {"utilization": 40.0, "resets_at": "2026-08-10T12:00:00+00:00"},
+        })
+        self.assertEqual(list(result["windows"]), ["5h", "7d"])
+        self.assertEqual(result["windows"]["5h"]["used_fraction"], 0.05)
+
+    def test_scoped_window_without_reset_is_dropped(self) -> None:
+        limits = self.LIMITS + [
+            {"kind": "weekly_scoped", "percent": 0, "resets_at": None,
+             "scope": {"model": {"display_name": "Opus"}}},
+        ]
+        result = self._collect({"limits": limits})
+        self.assertEqual(list(result["windows"]), ["5h", "7d", "7d (Fable)"])
 
 
 if __name__ == "__main__":
