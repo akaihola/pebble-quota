@@ -3,7 +3,6 @@ name: Build PBW
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -20,6 +19,9 @@ jobs:
       PEBBLE_SDK_VERSION: '4.33.1'
     steps:
       - uses: actions/checkout@v7.0.1
+
+      - name: Validate watchface version
+        run: jq -e '.version | test("^[0-9]+\\.[0-9]+\\.0$")' watchface/package.json >/dev/null
 
       - uses: actions/setup-node@v7.0.0
         with:
@@ -50,6 +52,17 @@ jobs:
         working-directory: watchface
         run: make clean build
 
+      - name: Verify PBW metadata
+        working-directory: watchface
+        run: |
+          version=$(jq -er '.version' package.json)
+          unzip -t build/watchface.pbw >/dev/null
+          unzip -p build/watchface.pbw appinfo.json |
+            jq -e --arg version "$version" \
+              '.versionLabel == $version and
+               .uuid == "55cd5be7-0481-48aa-a20e-2edf1d8b713b" and
+               .targetPlatforms == ["emery"]' >/dev/null
+
       - name: Upload PBW
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -57,9 +70,27 @@ jobs:
           path: watchface/build/watchface.pbw
           if-no-files-found: error
 
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
+  release-please:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs['watchface--release_created'] }}
+      tag_name: ${{ steps.release.outputs['watchface--tag_name'] }}
+      version: ${{ steps.release.outputs['watchface--version'] }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+
+  publish:
+    if: needs.release-please.outputs.release_created == 'true'
+    needs: [build, release-please]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -74,13 +105,14 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
         run: |
           version=$(jq -er '.version' watchface/package.json)
-          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "tag $GITHUB_REF_NAME does not match package version $version" >&2
+          if [[ "$RELEASE_VERSION" != "$version" || "$RELEASE_TAG" != "v$version" ]]; then
+            echo "release $RELEASE_TAG ($RELEASE_VERSION) does not match package version $version" >&2
             exit 1
           fi
           asset="pebble-quota-emery-$version.pbw"
           mv release/watchface.pbw "release/$asset"
-          gh release create "$GITHUB_REF_NAME" "release/$asset" \
-            --verify-tag --generate-notes --title "Quota Pace $version"
+          gh release upload "$RELEASE_TAG" "release/$asset"
