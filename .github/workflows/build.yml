@@ -13,20 +13,38 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PEBBLE_PYTHON_VERSION: '3.12.3'
+      PEBBLE_NODE_VERSION: '24'
+      PEBBLE_TOOL_VERSION: '5.0.40'
+      PEBBLE_SDK_VERSION: '4.33.1'
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: actions/setup-node@v7.0.0
         with:
-          node-version: 24
+          node-version: ${{ env.PEBBLE_NODE_VERSION }}
 
       - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.PEBBLE_PYTHON_VERSION }}
+
+      - name: Install Pebble CLI
+        run: uv tool install --python "$PEBBLE_PYTHON_VERSION" "pebble-tool==$PEBBLE_TOOL_VERSION"
+
+      - name: Cache Pebble SDK
+        id: sdk-cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.local/share/pebble-sdk
+          key: pebble-sdk-${{ runner.os }}-${{ runner.arch }}-python${{ env.PEBBLE_PYTHON_VERSION }}-node${{ env.PEBBLE_NODE_VERSION }}-tool${{ env.PEBBLE_TOOL_VERSION }}-sdk${{ env.PEBBLE_SDK_VERSION }}
 
       - name: Install Pebble SDK
-        run: |
-          uv tool install pebble-tool
-          pebble sdk install latest
-          pebble --version
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: pebble sdk install "$PEBBLE_SDK_VERSION"
+
+      - name: Verify Pebble SDK
+        run: pebble --version
 
       - name: Build watchface
         working-directory: watchface
