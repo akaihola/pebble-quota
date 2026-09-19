@@ -81,4 +81,4 @@ The collector runs continuously on `gogo` as `pebble-quota.service`, refreshing 
 https://gogo.crane-boa.ts.net:8450/v1/watch
 ```
 
-The authenticated endpoint, PebbleKit JS transport, Emery watch face, and headless-emulator path are working. Physical Android/Pebble deployment still needs a configuration flow that stores this endpoint and the service token in PebbleKit JS local storage without committing the token.
+The authenticated endpoint, PebbleKit JS transport, Emery watch face, and headless-emulator path are working. The settings page stores the endpoint and service token in PebbleKit JS local storage without committing the token. See the [physical Pebble installation instructions](watchface/README.md#install-on-a-physical-pebble) and [task tracker](TASKS.md) for remaining work.
