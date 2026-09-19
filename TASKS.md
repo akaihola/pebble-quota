@@ -28,9 +28,15 @@ Here are the rules for TASKS.md usage:
   - a numbered reference-style link (e.g. `[1]`) to a description file, or
   - `[*]` to indicate no description file is needed for a simple task.
 - Link references are listed between `## Completed` and `## Rules`.
-- If any issue is missing a link:
-  - Create the first missing numbered description file in
-    docs/tasks/<NNN-issue-description>.md and add the link
+- Keep each issue in exactly one status section.
+- Keep simple tasks inline with `[*]`. For longer tasks, keep a concise summary
+  here and move requirements, rationale, examples, and acceptance criteria to
+  `docs/tasks/<N-issue-description>.md`, preserving all substantive details.
+- Reuse existing task numbers and description files. For a new description,
+  use the first unused positive integer across this tracker and `docs/tasks/`,
+  without zero-padding, and add its numbered reference-style link.
+- Verify links and status changes against description files, repository history,
+  and available task-tracker evidence before changing issue placement.
 
 ### Modifying issues
 
