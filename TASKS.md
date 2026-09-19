@@ -11,9 +11,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Completed
 
+- [*] Settings page for endpoint + token (survive reinstalls)
+
 [*]: TASKS.md
 [1]: docs/tasks/1-fix-codex-one-percent.md
-- [*] Settings page for endpoint + token (survive reinstalls)
 
 ---
 
