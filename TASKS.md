@@ -9,9 +9,9 @@ Rules for TASKS.md usage are at the bottom of the file.
 ## In progress
 
 
-## Completed
+## Completed / Accepted
 
-- [*] Settings page for endpoint + token (survive reinstalls)
+- [ ] [*] Settings page for endpoint + token (survive reinstalls)
 
 [*]: TASKS.md
 [1]: docs/tasks/1-fix-codex-one-percent.md
@@ -24,10 +24,18 @@ Here are the rules for TASKS.md usage:
 
 ### TASKS.md maintenance sessions
 
-- Each backlog item must be prefixed with either
+- In `## Completed / Accepted`, `- [ ] [N] summary` or `- [ ] [*] summary`
+  means completed work awaiting user acceptance. `- [x] [N] summary` or
+  `- [x] [*] summary` means the user has accepted it. Only user acceptance
+  changes `[ ]` to `[x]`; completion, tests and deployment do not.
+- Move newly completed issues into `## Completed / Accepted` with `[ ]`.
+- During the next maintenance run, remove only `[x]` issues from this section,
+  plus their unused description files and reference-style links. Keep `[ ]`
+  issues and any files or links still referenced by another issue.
+- Each issue must retain either
   - a numbered reference-style link (e.g. `[1]`) to a description file, or
   - `[*]` to indicate no description file is needed for a simple task.
-- Link references are listed between `## Completed` and `## Rules`.
+- Link references are listed between `## Completed / Accepted` and `## Rules`.
 - Keep each issue in exactly one status section.
 - Keep simple tasks inline with `[*]`. For longer tasks, keep a concise summary
   here and move requirements, rationale, examples, and acceptance criteria to
@@ -45,9 +53,9 @@ Here are the rules for TASKS.md usage:
   - indented `- Depends on: [N]` bullets in TASKS.md, and
   - YAML frontmatter in description files.
 - Ensure backlog order respects dependencies.
-- When you move an issue to a different section, move its lines without
-  a change. Keep the prefix, the bullet text and the line wrapping the same.
-  Git can then see the move, and concurrent moves do not cause a conflict.
+- When you move an issue, preserve its identifier, text and line wrapping.
+  Change only the status checkbox when completion or user acceptance requires it.
+  This keeps moves identifiable in Git and reduces avoidable conflicts.
 
 ### Workflow for new issue completion
 
@@ -61,4 +69,5 @@ Here are the rules for TASKS.md usage:
 - Implement the plan, and lint, test, review and refine the implementation in
   the worktree feature branch.
 - Merge the rebased branch on `main`, and remove the worktree and branch.
-- Move the issue to `Completed` in TASKS.md and commit.
+- Move the issue to `Completed / Accepted` in TASKS.md with `[ ]`,
+  pending user acceptance, and commit.
