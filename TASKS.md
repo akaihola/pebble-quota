@@ -2,12 +2,15 @@
 
 Rules for TASKS.md usage are at the bottom of the file.
 
+## Unverified proposals
+
 ## Ordered backlog
 
 - [1] Fix Codex 1% showing as 100%
 
-## In progress
+## Scheduled
 
+## In Progress
 
 ## Completed / Accepted
 
