@@ -6,9 +6,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [1] Fix Codex 1% showing as 100%
-
 ## Scheduled
+
+- [1] Fix Codex 1% showing as 100%
+  <!-- hai:{"updatedAt":"2026-10-07T00:02:13.843Z"} -->
 
 ## In Progress
 
