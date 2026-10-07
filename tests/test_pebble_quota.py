@@ -33,6 +33,16 @@ class PaceTests(unittest.TestCase):
         self.assertEqual(quota.pace_points(1.0, 900, 100, 1000), 0)
 
 
+class PercentFractionTests(unittest.TestCase):
+    def test_codex_used_percent_is_always_a_percentage(self) -> None:
+        self.assertEqual(quota.percent_fraction(0), 0.0)
+        self.assertEqual(quota.percent_fraction(1), 0.01)
+        self.assertEqual(quota.percent_fraction(100), 1.0)
+
+    def test_missing_used_percent_is_none(self) -> None:
+        self.assertIsNone(quota.percent_fraction(None))
+
+
 class CompactTests(unittest.TestCase):
     def test_compacts_and_sorts_services(self) -> None:
         data = {

@@ -52,6 +52,11 @@ def fraction(value: int | float | None) -> float | None:
     return result / 100.0 if result > 1 else result
 
 
+def percent_fraction(value: int | float | None) -> float | None:
+    """Convert a 0-100 percentage to a fraction; 1 means 1%, never 100%."""
+    return None if value is None else float(value) / 100.0
+
+
 def pace_points(used_fraction: float, resets_at: int, duration_seconds: int, now: int) -> int:
     """Positive means usage is behind time: quota is ahead of sustainable pace."""
     remaining_seconds = max(0, min(duration_seconds, resets_at - now))
@@ -177,7 +182,7 @@ def collect_codex() -> dict[str, Any]:
                     minutes = item.get("windowDurationMins")
                     name = DURATIONS.get(minutes, f"{minutes}m" if minutes else source)
                     windows[name] = {
-                        "used_fraction": fraction(item.get("usedPercent")),
+                        "used_fraction": percent_fraction(item.get("usedPercent")),
                         "resets_at": iso_from_epoch(item.get("resetsAt")),
                         "duration_seconds": int(minutes * 60) if minutes else None,
                     }
