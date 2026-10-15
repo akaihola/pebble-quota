@@ -13,8 +13,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 ## Completed / Accepted
 
 - [ ] [*] Settings page for endpoint + token (survive reinstalls)
-- [ ] [1] Fix Codex 1% showing as 100%
-  <!-- hai:{"updatedAt":"2026-10-07T00:02:13.843Z"} -->
+- [x] [1] Fix Codex 1% showing as 100%
+  <!-- hai:{"updatedAt":"2026-10-10T19:45:45.366Z"} -->
 
 [*]: TASKS.md
 [1]: docs/tasks/1-fix-codex-one-percent.md
