@@ -6,6 +6,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [2] Back off on HTTP 429 from Claude's usage endpoint and keep the last
+  reading
+  <!-- hai:{"id":"simple-6ff28cdb-2526-474f-84cd-846a148f59e0","labels":["steward"],"createdAt":"2026-10-17T08:11:31.000Z","updatedAt":"2026-10-17T08:11:31.000Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -20,6 +24,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 [1]: docs/tasks/1-fix-codex-one-percent.md
 
 ---
+
+[2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
+
+<!-- hai:reserved-numbers:1,2 -->
 
 ## Rules
 
