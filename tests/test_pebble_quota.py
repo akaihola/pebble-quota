@@ -8,6 +8,7 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from email.message import Message
 from pathlib import Path
 from unittest import mock
 
@@ -117,6 +118,159 @@ class RefreshTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "preserving previous"):
                     quota.refresh_snapshot(output)
             self.assertEqual(json.loads(output.read_text()), previous)
+
+
+class ClaudeBackoffTests(unittest.TestCase):
+    PAYLOAD = {"five_hour": {"utilization": 20, "resets_at": 18000}}
+
+    def setUp(self) -> None:
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        home = Path(directory)
+        credentials = home / ".claude/.credentials.json"
+        credentials.parent.mkdir()
+        credentials.write_text(json.dumps({"claudeAiOauth": {"accessToken": "test"}}))
+        self.enterContext(mock.patch.object(quota.Path, "home", return_value=home))
+        self.output = home / "latest.json"
+        self.now = 0
+        self.enterContext(mock.patch.object(
+            quota, "utc_iso", side_effect=lambda: quota.iso_from_epoch(self.now)))
+        self.codex = self.enterContext(mock.patch.object(
+            quota, "collect_codex", return_value={"service": "codex", "windows": {}}))
+        self.enterContext(mock.patch.object(quota, "collect_temperature", return_value=222))
+        self.http = self.enterContext(mock.patch.object(
+            quota.urllib.request, "urlopen",
+            side_effect=lambda *args, **kwargs: _FakeResponse(self.PAYLOAD)))
+
+    def http_error(self, retry_after: str | None = None, code: int = 429) -> None:
+        headers = Message()
+        if retry_after is not None:
+            headers["Retry-After"] = retry_after
+        self.http.side_effect = urllib.error.HTTPError(
+            "https://api.anthropic.com/api/oauth/usage", code, "Too Many Requests",
+            headers, None)
+
+    def refresh(self) -> dict:
+        return quota.refresh_snapshot(self.output)["services"]["claude"]
+
+    def test_429_keeps_windows_and_persists_cooldown_until_recovery(self) -> None:
+        good = self.refresh()
+        self.now = 300
+        self.http_error("1200")
+        stale = self.refresh()
+        self.assertEqual(stale["windows"], good["windows"])
+        self.assertTrue(stale["stale"])
+        self.assertEqual(stale["last_success_at"], quota.iso_from_epoch(0))
+        self.assertEqual(stale["age_seconds"], 300)
+        self.assertIn("HTTPError", stale["error"])
+        self.assertEqual(quota.epoch(stale["retry_at"]), 1500)
+        self.assertEqual(stale["rate_limit_failures"], 1)
+        # Each refresh reloads state from disk, including a restarted collector.
+        self.now = 1499
+        self.http.reset_mock()
+        cooling = self.refresh()
+        self.http.assert_not_called()
+        self.assertEqual(cooling["age_seconds"], 1499)
+        self.assertEqual(cooling["retry_at"], stale["retry_at"])
+        self.assertEqual(cooling["error"], stale["error"])
+        self.assertEqual(self.codex.call_count, 3)
+        snapshot = json.loads(self.output.read_text())
+        self.assertEqual(snapshot["temperature_c_tenths"], 222)
+        self.assertEqual(quota.compact_watch(snapshot, now=self.now)["q"][0]["u"], 20)
+        # The steward's existing errors and windows comprehensions still work.
+        self.assertEqual({name: data["error"] for name, data in snapshot["services"].items()
+                          if "error" in data}, {"claude": stale["error"]})
+        self.assertEqual([label for data in snapshot["services"].values()
+                          for label in data.get("windows", {})], ["5h"])
+        self.now = 1500
+        self.http.side_effect = lambda *args, **kwargs: _FakeResponse(self.PAYLOAD)
+        recovered = self.refresh()
+        self.http.assert_called_once()
+        self.assertEqual(recovered["last_success_at"], quota.iso_from_epoch(1500))
+        for key in ("error", "stale", "age_seconds", "retry_at", "rate_limit_failures"):
+            self.assertNotIn(key, recovered)
+        self.now = 1800
+        self.http_error()
+        self.assertEqual(self.refresh()["rate_limit_failures"], 1)
+
+    def test_retry_delay_starts_when_the_429_response_arrives(self) -> None:
+        self.now = 300
+        self.http_error("60")
+        error = self.http.side_effect
+
+        def delayed_error(*args: object, **kwargs: object) -> None:
+            self.now += 15
+            raise error
+
+        self.http.side_effect = delayed_error
+        self.assertEqual(quota.epoch(self.refresh()["retry_at"]), 375)
+
+    def test_both_providers_failing_still_records_claude_staleness(self) -> None:
+        self.refresh()
+        self.now = 300
+        self.http_error()
+        self.codex.side_effect = RuntimeError("offline")
+        result = self.refresh()
+        self.assertTrue(result["stale"])
+        self.assertEqual(result["age_seconds"], 300)
+        self.assertIn("offline", json.loads(self.output.read_text())["services"]["codex"]["error"])
+
+    def test_http_date_retry_after(self) -> None:
+        self.http_error("Thu, 01 Jan 1970 02:00:00 GMT")
+        result = self.refresh()
+        self.assertEqual(quota.epoch(result["retry_at"]), 7200)
+        self.assertIn("error", result)
+        self.assertNotIn("windows", result)
+        self.assertNotIn("stale", result)
+        self.now = 7199
+        self.http.reset_mock()
+        self.refresh()
+        self.http.assert_not_called()
+
+    def test_unhelpful_retry_after_uses_exponential_backoff_with_cap(self) -> None:
+        for header in (None, "0", "invalid", "-1", "9" * 100,
+                       "Wed, 31 Dec 1969 23:59:59 GMT"):
+            with self.subTest(header=header):
+                self.output.unlink(missing_ok=True)
+                self.now = 0
+                for failures, delay in enumerate((600, 1200, 2400, 3600, 3600), 1):
+                    self.http_error(header)
+                    result = self.refresh()
+                    self.assertEqual(result["rate_limit_failures"], failures)
+                    self.assertEqual(quota.epoch(result["retry_at"]), self.now + delay)
+                    self.now += delay - 1
+                    self.http.reset_mock()
+                    self.refresh()
+                    self.http.assert_not_called()
+                    self.now += 1
+
+    def test_old_snapshot_gets_original_reading_age_on_other_errors(self) -> None:
+        previous = {"collected_at": quota.iso_from_epoch(0), "services": {
+            "claude": {"windows": {"5h": {"used_fraction": 0.2}}}}}
+        self.output.write_text(json.dumps(previous))
+        self.now = 300
+        self.http_error(code=503)
+        result = self.refresh()
+        self.assertTrue(result["stale"])
+        self.assertEqual(result["age_seconds"], 300)
+        self.assertNotIn("retry_at", result)
+        self.now = 600
+        self.http.reset_mock()
+        result = self.refresh()
+        self.http.assert_called_once()
+        self.assertEqual(result["age_seconds"], 600)
+
+    def test_codex_continues_refreshing_while_claude_has_no_reading(self) -> None:
+        self.codex.return_value = {"windows": {"5h": {"used_fraction": 0.1}}}
+        self.http_error("900")
+        first = self.refresh()
+        self.assertNotIn("windows", first)
+        self.now = 300
+        self.codex.return_value = {"windows": {"5h": {"used_fraction": 0.2}}}
+        self.http.reset_mock()
+        self.refresh()
+        self.http.assert_not_called()
+        self.assertEqual(json.loads(self.output.read_text())["services"]["codex"],
+                         self.codex.return_value)
 
 
 class HttpTests(unittest.TestCase):

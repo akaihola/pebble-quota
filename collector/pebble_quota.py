@@ -11,14 +11,18 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
 DURATIONS = {300: "5h", 10_080: "7d"}
+CLAUDE_BACKOFF_SECONDS = 600
+CLAUDE_MAX_BACKOFF_SECONDS = 3600
 
 # Home Assistant entity for the local Koivusyrjä outside temperature (met.no forecast).
 HASS_TEMPERATURE_ENTITY = "weather.forecast_koti"
@@ -222,16 +226,58 @@ def collect_temperature() -> int | None:
     return round(float(value) * 10)
 
 
-def collect_all() -> dict[str, Any]:
+def claude_retry_delay(retry_after: str | None, failures: int, now: int) -> float:
+    """Honor useful Retry-After values; zero/malformed values need real backoff."""
+    if retry_after:
+        retry_after = retry_after.strip()
+        try:
+            delay = (int(retry_after) if retry_after.isdigit()
+                     else parsedate_to_datetime(retry_after).timestamp() - now)
+            if delay > 0:
+                # Reject out-of-range dates before persisting a retry deadline.
+                iso_from_epoch(now + delay)
+                return delay
+        except (ValueError, TypeError, OverflowError, OSError):
+            pass
+    return min(CLAUDE_MAX_BACKOFF_SECONDS,
+               CLAUDE_BACKOFF_SECONDS * 2 ** min(failures - 1, 3))
+
+
+def collect_all(previous: dict[str, Any] | None = None) -> dict[str, Any]:
     output: dict[str, Any] = {"collected_at": utc_iso(), "services": {}}
+    now = epoch(output["collected_at"])
+    assert now is not None
+    previous = previous or {}
+    old_claude = previous.get("services", {}).get("claude", {})
     collectors: tuple[tuple[str, Callable[[], dict[str, Any]]], ...] = (
         ("claude", collect_claude), ("codex", collect_codex)
     )
     for name, collector in collectors:
+        if name == "claude" and (epoch(old_claude.get("retry_at")) or 0) > now:
+            output["services"][name] = dict(old_claude)
+            continue
         try:
             output["services"][name] = collector()
+            if name == "claude" and output["services"][name].get("windows"):
+                output["services"][name]["last_success_at"] = output["collected_at"]
         except Exception as exc:
-            output["services"][name] = {"service": name, "error": f"{type(exc).__name__}: {exc}"}
+            service = {"service": name, "error": f"{type(exc).__name__}: {exc}"}
+            output["services"][name] = service
+            if name == "claude" and isinstance(exc, urllib.error.HTTPError) and exc.code == 429:
+                failures = old_claude.get("rate_limit_failures", 0) + 1
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                retry_now = epoch(utc_iso()) or now
+                service["rate_limit_failures"] = failures
+                service["retry_at"] = iso_from_epoch(
+                    retry_now + claude_retry_delay(retry_after, failures, retry_now))
+                exc.close()
+    claude = output["services"]["claude"]
+    if "error" in claude and old_claude.get("windows"):
+        last_success = old_claude.get("last_success_at", previous.get("collected_at"))
+        claude.update(
+            windows=old_claude["windows"], last_success_at=last_success,
+            stale=True, age_seconds=max(0, now - (epoch(last_success) or 0)),
+        )
     # Outside temperature is best-effort: a Home Assistant outage must never block
     # quota delivery, so record the error and omit the value rather than raise.
     try:
@@ -287,8 +333,13 @@ def has_quota_data(data: dict[str, Any]) -> bool:
 
 
 def refresh_snapshot(output: Path) -> dict[str, Any]:
-    data = collect_all()
-    if not has_quota_data(data):
+    try:
+        previous = json.loads(output.read_text())
+    except (FileNotFoundError, ValueError):
+        previous = {}
+    data = collect_all(previous)
+    # Persist a cooldown even on the first failed read, when no windows exist yet.
+    if not has_quota_data(data) and not data["services"].get("claude", {}).get("retry_at"):
         if output.exists():
             raise RuntimeError("all quota collectors failed; preserving previous snapshot")
         raise RuntimeError("all quota collectors failed; no snapshot available")

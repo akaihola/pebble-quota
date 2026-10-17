@@ -37,6 +37,24 @@ Response fields are intentionally compact for PebbleKit JS:
 
 Claude collection uses an undocumented OAuth endpoint used by Claude Code itself. Codex collection uses the supported local app-server JSON-RPC method `account/rateLimits/read`.
 
+Claude HTTP 429 responses pause subsequent Claude requests until a persisted
+`retry_at` deadline. Positive `Retry-After` seconds and HTTP dates take precedence;
+missing, zero, invalid or expired values use 10, 20, 40, then 60 minutes between
+attempts. Requests resume on the first refresh at or after that deadline. Codex
+and temperature continue refreshing during the cooldown. Success clears the retry
+state. The state survives restarts and repeated `collect` commands when they use
+the same output file.
+
+In the full snapshot, a failed Claude refresh keeps its last successful `windows`
+alongside the existing service `error`, with `stale: true`, `last_success_at` and
+`age_seconds`. Age counts from the successful reading, not from the last retry.
+`collected_at` still describes the current collection pass. With no previous
+Claude reading, the service has an error and retry state but no windows. A first
+429 saves this state even if Codex also fails. The watch payload keeps its existing
+format and includes the retained windows; the steward can still read both windows
+and per-service errors. Consumers must use the service's `error` or `stale` field
+to distinguish retained windows from a fresh reading.
+
 Outside temperature is a best-effort read of the Home Assistant entity `weather.forecast_koti` (met.no forecast for Koivusyrjä). It uses `HASS_TOKEN` (a Home Assistant long-lived token, kept outside the repo on `gogo`) and `HASS_SERVER` (default `http://localhost:8123`). A Home Assistant outage never blocks quota delivery: the temperature is simply omitted rather than reported as a fabricated value.
 
 ## Watch face
