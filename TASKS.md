@@ -8,10 +8,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Scheduled
 
-- [4] Gather acceptance evidence for the 2 review-queue items
-  <!-- hai:{"id":"simple-0ffccc90-511b-4832-bb81-534f3491d36f","labels":["steward"],"createdAt":"2026-10-17T20:09:27.170Z","updatedAt":"2026-10-17T20:22:22.848Z"} -->
-
 ## In Progress
+
+- [~] [4] Gather acceptance evidence for the 2 review-queue items
+      <!-- hai:{"id":"simple-0ffccc90-511b-4832-bb81-534f3491d36f","labels":["steward"],"createdAt":"2026-10-17T20:09:27.170Z","updatedAt":"2026-10-17T20:22:43.500Z"} -->
 
 ## Completed / Accepted
 

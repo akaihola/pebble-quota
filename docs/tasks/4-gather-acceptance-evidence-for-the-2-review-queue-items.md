@@ -54,3 +54,14 @@ grouped by verdict and the counts per verdict at the end.
 
 - Every listed item has a line with evidence and a verdict.
 - Nothing outside this file and the issue's own tracker moves changed.
+
+## Plan
+
+1. Read the shadow acceptance policy and identify the delivery commits for
+   [2] and the legacy settings item on current main.
+2. Run the full unittest suite once on main and inspect both implementations,
+   including settings persistence and reader compatibility.
+3. Attempt each delivery revert independently in a disposable detached main
+   worktree. Separate tracker-only conflicts from implementation conflicts.
+4. Record one evidence line per item, grouped by policy verdict with totals.
+   Merge the documentation locally and complete [4] pending Antti's acceptance.
