@@ -10,11 +10,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [2] Back off on HTTP 429 from Claude's usage endpoint and keep the last
-  reading
-      <!-- hai:{"id":"simple-6ff28cdb-2526-474f-84cd-846a148f59e0","labels":["steward"],"createdAt":"2026-10-17T08:11:31.000Z","updatedAt":"2026-10-17T08:55:51.161Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [2] Back off on HTTP 429 from Claude's usage endpoint and keep the last
+  reading
+      <!-- hai:{"id":"simple-6ff28cdb-2526-474f-84cd-846a148f59e0","labels":["steward"],"createdAt":"2026-10-17T08:11:31.000Z","updatedAt":"2026-10-17T08:56:22.186Z"} -->
 
 - [ ] [*] Settings page for endpoint + token (survive reinstalls)
 - [x] [1] Fix Codex 1% showing as 100%
