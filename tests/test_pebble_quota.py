@@ -466,6 +466,27 @@ class ClaudeCollectTests(unittest.TestCase):
                 ):
                     return quota.collect_claude()
 
+    def test_limits_percentages(self) -> None:
+        for percent, expected in ((0, 0.0), (1, 0.01), (100, 1.0)):
+            with self.subTest(percent=percent):
+                result = self._collect({"limits": [
+                    {**limit, "percent": percent} for limit in self.LIMITS
+                ]})
+                self.assertEqual(set(result["windows"]), {"5h", "7d", "7d (Fable)"})
+                for window in result["windows"].values():
+                    self.assertEqual(window["used_fraction"], expected)
+
+    def test_legacy_percentages(self) -> None:
+        for percent, expected in ((0, 0.0), (1, 0.01), (100, 1.0)):
+            with self.subTest(percent=percent):
+                result = self._collect({
+                    name: {"utilization": percent, "resets_at": "2026-08-10T12:00:00+00:00"}
+                    for name in ("five_hour", "seven_day")
+                })
+                self.assertEqual(set(result["windows"]), {"5h", "7d"})
+                for window in result["windows"].values():
+                    self.assertEqual(window["used_fraction"], expected)
+
     def test_limits_are_preferred_and_include_fable(self) -> None:
         result = self._collect({
             "five_hour": {"utilization": 1.0, "resets_at": "2026-08-03T22:00:00+00:00"},

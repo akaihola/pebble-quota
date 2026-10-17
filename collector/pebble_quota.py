@@ -49,13 +49,6 @@ def epoch(value: int | float | str | None) -> int | None:
     return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
 
 
-def fraction(value: int | float | None) -> float | None:
-    if value is None:
-        return None
-    result = float(value)
-    return result / 100.0 if result > 1 else result
-
-
 def percent_fraction(value: int | float | None) -> float | None:
     """Convert a 0-100 percentage to a fraction; 1 means 1%, never 100%."""
     return None if value is None else float(value) / 100.0
@@ -104,7 +97,7 @@ def claude_windows_from_limits(limits: Any) -> dict[str, Any]:
         else:
             continue
         windows[name] = {
-            "used_fraction": fraction(percent),
+            "used_fraction": percent_fraction(percent),
             "resets_at": resets_at,
             "duration_seconds": seconds,
         }
@@ -135,7 +128,7 @@ def collect_claude() -> dict[str, Any]:
     ):
         if item := raw.get(source):
             windows[name] = {
-                "used_fraction": fraction(item.get("utilization")),
+                "used_fraction": percent_fraction(item.get("utilization")),
                 "resets_at": item.get("resets_at"),
                 "duration_seconds": seconds,
             }
