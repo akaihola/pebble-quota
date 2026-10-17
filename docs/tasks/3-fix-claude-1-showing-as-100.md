@@ -38,3 +38,17 @@ recorded the wrong value.
   code until Antti restarts it. A live check is optional, as one collection
   written to `$TMPDIR`, never to the service's output file.
 - Don't push.
+
+## Implementation and validation
+
+- Commit `5001e41` uses `percent_fraction()` for both Claude payload formats
+  and removes the unused `fraction()` heuristic. Merged locally to main.
+- Two new regression tests cover 0, 1 and 100 for session, weekly_all,
+  weekly_scoped, five_hour and seven_day windows. Before the fix, both tests
+  failed at 1 with `1.0 != 0.01`; all cases pass after the fix.
+- `python3 -m unittest discover -s tests -v`: 35 tests passed, zero failures.
+- `ruff check --select E9,F63,F7,F82 collector/pebble_quota.py tests/test_pebble_quota.py`
+  and `git diff --check` passed. Full Ruff has existing diagnostics, with no
+  new code/message pairs: collector count fell from 10 to 9, tests stayed 14.
+- No service restart, live collection, service-output write or push performed.
+  The running collector retains its old code until Antti restarts it.
