@@ -35,3 +35,18 @@ and for the steward's `quota.jsonl`.
 - A simulated 429 keeps the previous windows, marked stale with the error, and
   delays the next Claude request as the headers or the backoff say.
 - Existing tests pass.
+
+## Plan
+
+1. Inspect one live response and kandev-pacer's cache. Record what can and
+   cannot be established about this undocumented endpoint's limit.
+2. Persist Claude's retry deadline and consecutive 429 count in the snapshot.
+   Honor positive Retry-After seconds or HTTP dates; otherwise wait 10 minutes,
+   doubling after each attempted 429 up to one hour. Skip Claude during the
+   cooldown while continuing Codex and temperature collection.
+3. Preserve the last successful Claude windows with last_success_at, stale,
+   age_seconds and the existing error field. Read previous snapshots on each
+   refresh so cooldowns and reading age survive restarts and one-shot runs.
+4. Cover headers, backoff, repeated refreshes, recovery, missing prior data,
+   and existing reader behavior with deterministic tests. Run the full suite,
+   review the diff, merge to main, and complete the tracker without acceptance.
