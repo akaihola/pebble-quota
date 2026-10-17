@@ -11,10 +11,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Scheduled
 
-- [3] Fix Claude 1% showing as 100%
-  <!-- hai:{"id":"simple-d4d7e094-0d83-45fe-accf-7bedf7055f10","labels":["steward"],"createdAt":"2026-10-17T20:09:20.159Z","updatedAt":"2026-10-17T20:21:14.104Z"} -->
-
 ## In Progress
+
+- [~] [3] Fix Claude 1% showing as 100%
+      <!-- hai:{"id":"simple-d4d7e094-0d83-45fe-accf-7bedf7055f10","labels":["steward"],"createdAt":"2026-10-17T20:09:20.159Z","updatedAt":"2026-10-17T20:21:38.488Z"} -->
 
 ## Completed / Accepted
 

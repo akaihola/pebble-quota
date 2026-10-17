@@ -21,7 +21,10 @@ recorded the wrong value.
    unconditionally, as `percent_fraction()` does for Codex.
 2. Remove `fraction()` if nothing else uses it.
 3. Add regression tests for 0, 1 and 100 on both Claude paths (`limits[]` and
-   the legacy pair).
+   the legacy pair), including all supported limits kinds.
+4. Run the regression tests before and after the fix, then the full unittest
+   suite and focused lint checks. Review and merge locally to main, and mark
+   complete pending acceptance without restarting the service or pushing.
 
 ## Acceptance criteria
 
