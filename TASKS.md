@@ -6,6 +6,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [5] Check the 2026-09-19 architecture review's remediation plan against the
+  code and draft what remains
+  <!-- hai:{"id":"simple-9769a664-fbb2-4433-867c-5e4a0a5f5ae6","labels":["steward","review"],"createdAt":"2026-10-19T11:13:08.369Z","updatedAt":"2026-10-19T11:13:08.369Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -33,11 +37,13 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4 -->
+<!-- hai:reserved-numbers:1,2,3,4,5 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
 [4]: docs/tasks/4-gather-acceptance-evidence-for-the-2-review-queue-items.md
+
+[5]: docs/tasks/5-check-the-2026-09-19-architecture-review-s-remediation-plan-against-th.md
 
 ## Rules
 
