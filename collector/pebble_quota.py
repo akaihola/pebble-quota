@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import queue
 import subprocess
@@ -27,6 +28,7 @@ CLAUDE_MAX_BACKOFF_SECONDS = 3600
 # Home Assistant entity for the local Koivusyrjä outside temperature (met.no forecast).
 HASS_TEMPERATURE_ENTITY = "weather.forecast_koti"
 HASS_DEFAULT_SERVER = "http://localhost:8123"
+HASS_TEMPERATURE_MAX_AGE_SECONDS = 2 * 60 * 60
 
 
 def utc_iso() -> str:
@@ -197,9 +199,9 @@ def collect_temperature() -> int | None:
     """Local outside temperature in integer tenths of degC from Home Assistant.
 
     Returns None (rather than a fabricated value) whenever the reading cannot be
-    trusted: no HA token configured, the entity is unknown/unavailable, or the
-    temperature attribute is missing. Network/HTTP/JSON failures raise so the
-    caller can record the error while still delivering quota data.
+    trusted: missing token, unavailable entity, invalid value/unit, or missing,
+    future or older-than-two-hours last_updated. Network/HTTP/JSON failures raise
+    so the caller can record the error while still delivering quota data.
     """
     token = os.environ.get("HASS_TOKEN")
     if not token:
@@ -211,12 +213,31 @@ def collect_temperature() -> int | None:
     )
     with urllib.request.urlopen(request, timeout=5) as response:
         state = json.load(response)
-    if state.get("state") in (None, "unknown", "unavailable"):
+    if not isinstance(state, dict) or state.get("state") in (None, "unknown", "unavailable"):
         return None
-    value = state.get("attributes", {}).get("temperature")
-    if value is None:
+    attributes = state.get("attributes")
+    if not isinstance(attributes, dict):
         return None
-    return round(float(value) * 10)
+    value = attributes.get("temperature")
+    unit = attributes.get("temperature_unit")
+    if (type(value) not in (int, float) or not math.isfinite(value)
+            or unit not in ("°C", "°F")):
+        return None
+    updated = state.get("last_updated")
+    if not isinstance(updated, str):
+        return None
+    try:
+        updated_at = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if updated_at.tzinfo is None:
+        return None
+    # HA entity age is a proxy; it does not certify the weather observation time.
+    age = time.time() - updated_at.timestamp()
+    if not 0 <= age <= HASS_TEMPERATURE_MAX_AGE_SECONDS:
+        return None
+    celsius = (value - 32) * 5 / 9 if unit == "°F" else value
+    return round(celsius * 10)
 
 
 def claude_retry_delay(retry_after: str | None, failures: int, now: int) -> float:

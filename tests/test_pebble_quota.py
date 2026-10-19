@@ -354,52 +354,123 @@ def _urlopen_returning(payload: object):
 
 
 class TemperatureTests(unittest.TestCase):
-    STATE = {"state": "sunny", "attributes": {"temperature": 22.2}}
+    NOW = 1_800_000_000
+    STATE = {
+        "state": "sunny", "last_updated": "2027-01-15T08:00:00Z",
+        "attributes": {"temperature": 22.2, "temperature_unit": "°C"},
+    }
 
-    def test_reads_temperature_as_tenths(self) -> None:
-        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
-            with mock.patch.object(
-                quota.urllib.request, "urlopen", _urlopen_returning(self.STATE)
-            ):
-                self.assertEqual(quota.collect_temperature(), 222)
+    def setUp(self) -> None:
+        self.enterContext(mock.patch.dict(os.environ, {
+            "HASS_TOKEN": "test-token", "HASS_SERVER": "http://ha.invalid",
+        }, clear=True))
+        self.enterContext(mock.patch.object(quota.time, "time", return_value=self.NOW))
+        self.urlopen = self.enterContext(mock.patch.object(
+            quota.urllib.request, "urlopen", return_value=_FakeResponse(self.STATE)))
 
-    def test_negative_temperature_rounds_to_tenths(self) -> None:
-        state = {"state": "cloudy", "attributes": {"temperature": -5.35}}
-        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
-            with mock.patch.object(
-                quota.urllib.request, "urlopen", _urlopen_returning(state)
-            ):
-                self.assertEqual(quota.collect_temperature(), -54)
+    def test_supported_units_and_rounding(self) -> None:
+        for unit, value, expected in (
+            ("°C", 22.2, 222), ("°C", -5.35, -54), ("°C", 0, 0),
+            ("°F", 32, 0), ("°F", 68, 200), ("°F", -40, -400), ("°F", 72, 222),
+        ):
+            with self.subTest(unit=unit, value=value):
+                self.urlopen.return_value = _FakeResponse({
+                    **self.STATE,
+                    "attributes": {"temperature": value, "temperature_unit": unit},
+                })
+                self.assertEqual(quota.collect_temperature(), expected)
+        self.assertEqual(self.urlopen.call_args.args[0].full_url,
+                         "http://ha.invalid/api/states/weather.forecast_koti")
+        self.assertEqual(self.urlopen.call_args.kwargs["timeout"], 5)
 
-    def test_missing_token_returns_none(self) -> None:
-        env = {k: v for k, v in os.environ.items() if k != "HASS_TOKEN"}
-        with mock.patch.dict(os.environ, env, clear=True):
+    def test_missing_token_returns_none_without_request(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
             self.assertIsNone(quota.collect_temperature())
+        self.urlopen.assert_not_called()
 
-    def test_unavailable_state_returns_none(self) -> None:
-        state = {"state": "unavailable", "attributes": {}}
-        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
-            with mock.patch.object(
-                quota.urllib.request, "urlopen", _urlopen_returning(state)
-            ):
+    def test_missing_or_unknown_units_are_omitted(self) -> None:
+        for unit in (None, "K", "C", "F", "", [], {}):
+            with self.subTest(unit=unit):
+                attributes = {"temperature": 22.2}
+                if unit is not None:
+                    attributes["temperature_unit"] = unit
+                self.urlopen.return_value = _FakeResponse({**self.STATE, "attributes": attributes})
                 self.assertIsNone(quota.collect_temperature())
 
-    def test_malformed_state_missing_attribute_returns_none(self) -> None:
-        state = {"state": "sunny", "attributes": {"humidity": 44}}
-        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
-            with mock.patch.object(
-                quota.urllib.request, "urlopen", _urlopen_returning(state)
-            ):
+    def test_invalid_values_are_omitted(self) -> None:
+        for value in (None, "22.2", "unknown", True, [], {}, float("nan"), float("inf")):
+            with self.subTest(value=value):
+                self.urlopen.return_value = _FakeResponse({
+                    **self.STATE,
+                    "attributes": {"temperature": value, "temperature_unit": "°C"},
+                })
                 self.assertIsNone(quota.collect_temperature())
 
-    def test_network_error_propagates(self) -> None:
-        def boom(*args: object, **kwargs: object) -> None:
-            raise urllib.error.URLError("connection refused")
+    def test_entity_age_boundaries_and_timezone_offsets(self) -> None:
+        for age, expected in ((0, 222), (7200, 222), (7200.001, None), (-0.001, None)):
+            with self.subTest(age=age):
+                self.urlopen.return_value = _FakeResponse({
+                    **self.STATE, "last_updated": quota.iso_from_epoch(self.NOW - age),
+                })
+                self.assertEqual(quota.collect_temperature(), expected)
+        self.urlopen.return_value = _FakeResponse({
+            **self.STATE, "last_updated": "2027-01-15T10:00:00+02:00",
+            "last_changed": "2020-01-01T00:00:00Z",
+        })
+        self.assertEqual(quota.collect_temperature(), 222)
 
-        with mock.patch.dict(os.environ, {"HASS_TOKEN": "t"}, clear=False):
-            with mock.patch.object(quota.urllib.request, "urlopen", boom):
-                with self.assertRaises(urllib.error.URLError):
-                    quota.collect_temperature()
+    def test_missing_or_invalid_time_has_no_fallback(self) -> None:
+        for updated in (None, "", "bad", "2027-01-15T08:00:00", self.NOW, []):
+            with self.subTest(updated=updated):
+                state = {**self.STATE, "last_changed": self.STATE["last_updated"],
+                         "last_reported": self.STATE["last_updated"]}
+                state.pop("last_updated")
+                if updated is not None:
+                    state["last_updated"] = updated
+                self.urlopen.return_value = _FakeResponse(state)
+                self.assertIsNone(quota.collect_temperature())
+
+    def test_unavailable_or_malformed_entities_are_omitted(self) -> None:
+        states = [None, [], {}, *({**self.STATE, "state": state}
+                  for state in (None, "unknown", "unavailable")),
+                  *({**self.STATE, "attributes": attrs} for attrs in (None, [], {}, {"humidity": 44}))]
+        for state in states:
+            with self.subTest(state=state):
+                self.urlopen.return_value = _FakeResponse(state)
+                self.assertIsNone(quota.collect_temperature())
+
+    def test_ha_errors_preserve_quota_delivery(self) -> None:
+        claude = {"windows": {"5h": {
+            "used_fraction": 0.2, "resets_at": self.NOW + 100, "duration_seconds": 100,
+        }}}
+        self.enterContext(mock.patch.object(quota, "collect_claude", return_value=claude))
+        self.enterContext(mock.patch.object(quota, "collect_codex", return_value={"windows": {}}))
+        for error in (urllib.error.URLError("connection refused"), TimeoutError("HA slow"),
+                      urllib.error.HTTPError("http://ha.invalid", 401, "Unauthorized", {}, None),
+                      json.JSONDecodeError("invalid JSON", "bad", 0)):
+            with self.subTest(error=type(error).__name__):
+                if isinstance(error, urllib.error.HTTPError):
+                    self.addCleanup(error.close)
+                self.urlopen.side_effect = error
+                data = quota.collect_all({"temperature_c_tenths": 999})
+                self.assertTrue(quota.has_quota_data(data))
+                self.assertNotIn("temperature_c_tenths", data)
+                compact = quota.compact_watch(data, now=self.NOW)
+                self.assertNotIn("t", compact)
+                self.assertEqual(len(compact["q"]), 1)
+                self.assertIn(type(error).__name__, data["temperature_error"])
+
+    def test_stale_reading_does_not_retain_previous_temperature(self) -> None:
+        self.urlopen.return_value = _FakeResponse({
+            **self.STATE, "last_updated": quota.iso_from_epoch(self.NOW - 7201),
+        })
+        with (
+            mock.patch.object(quota, "collect_claude", return_value={"windows": {}}),
+            mock.patch.object(quota, "collect_codex", return_value={"windows": {}}),
+        ):
+            data = quota.collect_all({"temperature_c_tenths": 999})
+        self.assertNotIn("temperature_c_tenths", data)
+        self.assertNotIn("temperature_error", data)
 
 
 class CollectAllTemperatureTests(unittest.TestCase):

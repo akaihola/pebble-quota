@@ -33,7 +33,7 @@ Response fields are intentionally compact for PebbleKit JS:
 - `r`: reset time as Unix seconds
 - `d`: window duration in seconds
 - `p`: pace surplus in percentage points; positive is ahead, negative is behind
-- `t`: outside temperature in integer tenths of °C (optional; omitted when Home Assistant is unavailable)
+- `t`: outside temperature in integer tenths of °C (optional; omitted when Home Assistant is unavailable or the reading fails unit/age validation)
 
 Claude collection uses an undocumented OAuth endpoint used by Claude Code itself. Codex collection uses the supported local app-server JSON-RPC method `account/rateLimits/read`.
 
@@ -56,6 +56,30 @@ and per-service errors. Consumers must use the service's `error` or `stale` fiel
 to distinguish retained windows from a fresh reading.
 
 Outside temperature is a best-effort read of the Home Assistant entity `weather.forecast_koti` (met.no forecast for Koivusyrjä). It uses `HASS_TOKEN` (a Home Assistant long-lived token, kept outside the repo on `gogo`) and `HASS_SERVER` (default `http://localhost:8123`). A Home Assistant outage never blocks quota delivery: the temperature is simply omitted rather than reported as a fabricated value.
+
+The collector accepts only `attributes.temperature_unit` values `°C` and `°F`.
+Fahrenheit uses `(F - 32) * 5 / 9`; both units are rounded to integer tenths of
+Celsius with Python's `round`. Missing/unknown units, missing/nonnumeric/nonfinite
+values, and unknown/unavailable entities produce no temperature.
+
+Entity freshness requires an ISO 8601 `last_updated` with an explicit timezone,
+aged from zero through 7,200 seconds at collection time. Missing, malformed,
+timezone-free, future or older timestamps produce no temperature. The two-hour
+limit allows an hourly weather update plus collection delay. It is a conservative
+entity-age limit, not proof of when met.no observed the weather. HA's
+[`last_updated`](https://contributors.home-assistant.io/core/internals/states/)
+tracks state or attribute changes; unchanged weather can therefore age out, and
+an unrelated attribute change can refresh the entity timestamp. There is no
+fallback to `last_changed`, `last_reported` or the collection time.
+
+Each collection omits rejected temperature rather than retaining an older value.
+HTTP/network/JSON failures are recorded in `temperature_error` without removing
+quota data. Tests mock HA responses, time and credentials; they require no live HA.
+This check applies at collection time. An existing snapshot or an offline phone
+can still display an older accepted temperature. Task [9](docs/tasks/9-carry-freshness-and-failure-status-through-to-watch-rendering.md)
+will carry the original temperature timestamp through the API and phone to
+enforce display expiration
+when that proposal is promoted; its cross-device freshness work remains pending.
 
 ## Watch face
 

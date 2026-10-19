@@ -35,3 +35,22 @@ Authorized by the explicit HAI-13 implementation request on 2026-10-19.
   expiration and original observation-time transport belong to that follow-up.
 - Run the full unittest suite, Python compilation and whitespace checks, review
   the diff, merge on main and complete HAI-13 without user acceptance.
+
+## Completion evidence
+
+Implemented on 2026-10-19. Celsius metadata is required; Fahrenheit is converted
+before rounding. Invalid units, values and entity timestamps omit temperature.
+The two-hour entity-age policy and its observation-time limitation are documented
+in README.md. Proposal [9] remains pending; no phone/watch protocol change or
+deployment was performed.
+
+- `python3 -m unittest discover -s tests -q`: 38 tests pass, including mocked HA
+  unit/age validation, unavailable entities, HTTP/network/JSON failures, quota
+  survival and omission of a previous temperature after a rejected reading.
+- `python3 -m py_compile collector/pebble_quota.py tests/test_pebble_quota.py`:
+  passes. `git diff --check`: passes.
+- Ruff and ty checks were compared with main. Collector Ruff has the same nine
+  existing diagnostics; ty has the same three existing HTTP-server attribute
+  diagnostics. Existing test lint findings remain; no new diagnostic was added.
+- Reviewed unit conversion, timezone handling, exact age boundaries, unknown
+  metadata rejection, error isolation and the documented display-freshness limit.
