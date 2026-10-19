@@ -47,8 +47,8 @@ Here are the rules for TASKS.md usage:
 
 - In `## Completed / Accepted`, `- [ ] [N] summary` or `- [ ] [*] summary`
   means completed work awaiting user acceptance. `- [x] [N] summary` or
-  `- [x] [*] summary` means the user has accepted it. Only user acceptance
-  changes `[ ]` to `[x]`; completion, tests and deployment do not.
+  `- [x] [*] summary` means the user has accepted it. Only user acceptance, or the steward's under its
+  acceptance policy, changes `[ ]` to `[x]`; completion, tests and deployment do not.
 - Move newly completed issues into `## Completed / Accepted` with `[ ]`.
 - During the next maintenance run, remove only `[x]` issues from this section,
   plus their unused description files and reference-style links. Keep `[ ]`
