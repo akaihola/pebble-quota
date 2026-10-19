@@ -49,11 +49,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [5] Check the 2026-09-19 architecture review's remediation plan against the
-  code and draft what remains
-      <!-- hai:{"id":"simple-9769a664-fbb2-4433-867c-5e4a0a5f5ae6","labels":["steward","review"],"createdAt":"2026-10-19T11:13:08.369Z","updatedAt":"2026-10-19T12:33:16.489Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [5] Check the 2026-09-19 architecture review's remediation plan against the
+  code and draft what remains
+      <!-- hai:{"id":"simple-9769a664-fbb2-4433-867c-5e4a0a5f5ae6","labels":["steward","review"],"createdAt":"2026-10-19T11:13:08.369Z","updatedAt":"2026-10-19T12:37:44.460Z"} -->
 
 - [ ] [4] Gather acceptance evidence for the 2 review-queue items
       <!-- hai:{"id":"simple-0ffccc90-511b-4832-bb81-534f3491d36f","labels":["steward"],"createdAt":"2026-10-17T20:09:27.170Z","updatedAt":"2026-10-17T20:23:38.964Z"} -->
