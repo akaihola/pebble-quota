@@ -24,3 +24,16 @@ of its steps are done.
 - Change no code. Run tests only where a verdict needs them.
 - Every step of the plan has a verdict with evidence, and the tracker passes
   its own check if the Rules name one. Merge to `main` as the Rules describe.
+
+## Execution plan, 2026-10-19
+
+1. Compare main and its post-review history with every F1–F8 finding, ordered
+   step and lower-priority item; distinguish source fixes from deployment and
+   device verification. Preserve the original review text.
+2. Inspect all post-review runtime changes for unnecessary layers or duplication.
+   Run only offline checks needed to settle verdicts.
+3. Append a dated status section with evidence and remaining acceptance gaps.
+   Create distinct steward proposals through hai-tasks, with acceptance criteria
+   and dependencies, without duplicating completed percentage/backoff issues.
+4. Validate descriptions, links and the documentation-only diff; merge locally
+   to main, remove the feature checkout/branch, and complete [5] pending acceptance.
