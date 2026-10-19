@@ -9,9 +9,6 @@ Rules for TASKS.md usage are at the bottom of the file.
 
   <!-- hai:{"id":"simple-07285625-bd27-4eb2-8747-624e02681c4a","labels":["steward"],"createdAt":"2026-10-19T12:35:47.291Z","updatedAt":"2026-10-19T12:35:47.291Z"} -->
 
-- [13] Make temperature units and entity age explicit
-  <!-- hai:{"id":"simple-0df495bc-7407-4aec-a21b-301ab4b35cde","labels":["steward"],"createdAt":"2026-10-19T12:35:46.982Z","updatedAt":"2026-10-19T12:35:46.982Z"} -->
-
 - [12] Document recoverable operation and reconcile build release assumptions
     - Depends on: [6], [7], [8], [9], [10], [11], [13], [14]
 
@@ -44,6 +41,9 @@ Rules for TASKS.md usage are at the bottom of the file.
   <!-- hai:{"id":"simple-f5d94773-9467-431d-b527-2947873cdf46","labels":["steward"],"createdAt":"2026-10-19T12:35:35.429Z","updatedAt":"2026-10-19T12:35:35.429Z"} -->
 
 ## Ordered backlog
+
+- [13] Make temperature units and entity age explicit
+  <!-- hai:{"id":"simple-0df495bc-7407-4aec-a21b-301ab4b35cde","labels":["steward"],"createdAt":"2026-10-19T12:35:46.982Z","updatedAt":"2026-10-19T14:10:06.082Z"} -->
 
 ## Scheduled
 
