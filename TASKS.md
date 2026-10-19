@@ -152,6 +152,8 @@ Here are the rules for TASKS.md usage:
   it rebased afterwards.
 - Implement the plan, and lint, test, review and refine the implementation in
   the worktree feature branch.
-- Merge the rebased branch on `main`, and remove the worktree and branch.
+- Merge the rebased branch on `main`.
+- Keep the worktree and branch after merging. Remove them only when the user
+  explicitly requests it.
 - Move the issue to `Completed / Accepted` in TASKS.md with `[ ]`,
   pending user acceptance, and commit.
