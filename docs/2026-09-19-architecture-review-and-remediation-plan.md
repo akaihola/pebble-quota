@@ -253,3 +253,218 @@ Once the user chooses implementation scope, reconcile these steps into the exist
 The most valuable first actions are explicit percentage conversion, safe settings transport/recovery, and a CI behavior gate. Then protect valid snapshots and make freshness visible. Those changes address demonstrated failures while retaining the architecture that already fits the project.
 
 Limitations: no successful C/PBW compilation in this environment, no emulator or physical-watch run, no live provider contract or account verification, no production service/proxy inspection, and no online CI/release-history audit. Synthetic checks prove the identified code paths, not their production frequency. The review and plan are complete and ready for user review; implementation remains unstarted.
+
+## Status, 2026-10-19
+
+Audit of local `main` at `e0c1cab` (application code last changed in `5001e41`).
+There are exactly 24 commits from this review's commit `0d1d6f3` through the
+pre-start main `50d0dab`; the start/plan commits are additional tracker work.
+The original report above is preserved as historical evidence, including its
+then-current counts and completion boundary. This section supersedes its claim
+that implementation remains unstarted. It does not authorize deployment.
+
+Only the collector, its tests, root README and task records changed since the
+review. Phone JS, watch C, workflow, build/release configuration and spike are
+byte-identical to `0d1d6f3`. Evidence locations below name functions as well as
+current lines because the original line numbers predate the backoff additions.
+
+### Finding verdicts
+
+- **F1 — done in production source.** `9fff907` converts Codex `usedPercent`
+  unconditionally; `5001e41` converts both Claude `limits[].percent` and legacy
+  `utilization` and removes the magnitude heuristic. See `percent_fraction`,
+  `claude_windows_from_limits`, `collect_claude`, `collect_codex` in
+  `collector/pebble_quota.py:52–185`. Both commits add regressions. Claude's
+  legacy-unit evidence is recorded in `docs/tasks/3-fix-claude-1-showing-as-100.md`
+  (observed 1.0 then .02 at adjacent readings). This audit does not independently
+  verify the live payload or deployment. Remaining Step 1 checks are below.
+- **F2 — still open.** `has_quota_data` (323–325) still accepts truthy windows;
+  `compact_watch` (286–313) still converts unchecked rows as a whole response.
+  A synthetic incomplete window replaced a good file and emitted `q: []`;
+  NaN in Claude still prevents valid Codex serialization. `658613c` added loading
+  previous state in `refresh_snapshot` (328–340), but no shape validation: a
+  nonempty JSON array root raises before either provider is called. Corrupt JSON
+  falls back to `{}`; structurally invalid JSON does not. Track in proposal [8].
+- **F3 — partly done.** `658613c` retains Claude's windows on collection errors
+  with `last_success_at`, `stale`, `age_seconds`, plus persisted 429 cooldown;
+  `collect_all` (238–283) preserves the original observation time during retries.
+  README explains this full-snapshot behavior. Codex still disappears on partial
+  failure. `compact_watch` omits all provider status/age and uses collection-pass
+  `at`, so retained Claude appears recently refreshed on the watch. Expired
+  usage still acquires positive pace; no freshness threshold or temperature
+  expiry policy exists. C `draw_single_gauge`, `draw_combined_gauge` and
+  `canvas_update` still use received pace colors and locally advancing markers.
+  Track the remaining end-to-end work in [9], reusing the existing metadata.
+- **F4 — still open.** JS `configUrl` (58–63) still includes token in the query
+  and derives repair UI from saved endpoint; `webviewclosed` (69–79) accepts
+  nonempty strings without scheme/origin policy. `CONFIG_PAGE` still reads
+  `location.search`. Synthetic Node openURL confirms token query transport.
+  No independent bootstrap recovery exists. Track in [6]; do not reopen the
+  completed legacy settings issue.
+- **F5 — still open, with local coverage improved.** `9fff907`, `658613c` and
+  `5001e41` add Python regressions, increasing the suite from 24 to 35 tests.
+  `.github/workflows/build.yml` still only builds/checks PBW and releases after
+  that build; no unittest/Node behavior gate, Codex RPC fixture or C harness.
+  Local test success does not establish a release prerequisite. Track in [7].
+- **F6 — still open.** `collect_codex` (138–193) still does not inspect RPC
+  `error`, defaults a missing result to empty limits, waits on a queue without
+  EOF signaling, and kills without a second wait or explicit pipe cleanup.
+  The only post-review change within this adapter is percentage conversion.
+  Track in [10].
+- **F7 — still open.** Collector still emits arbitrary scoped rows; JS
+  `sendQuota` (11–30) ignores `v` and slices five; C `tuple_int`, `tuple_string`,
+  `inbox_received` (313–349) still permit incomplete/mistyped updates. Pairing
+  in `canvas_update` (280–290) still tests identity alone, not resets/durations.
+  Synthetic Node confirms acceptance of v99 and truncation from six to five.
+  Track selection, validation, pairing and transport checks in [11].
+- **F8 — partly done.** `658613c` documents cooldown, retained Claude windows,
+  original observation age and unchanged wire format in root README. The other
+  gaps persist: incomplete compact schema; missing runbook/service/proxy details;
+  SDK 4.17 wording vs CI 4.33.1 and Makefile `SDKs/current`; wrong endpoint/config
+  relationship and “always reachable” claim; undocumented phone cadence;
+  unverified reinstall persistence; runnable unmarked historical spike. Track
+  operational reconciliation in [12], settings details in [6], freshness in [9].
+
+### Ordered remediation step verdicts
+
+These verdicts cover each proposed change set, including verification and rollout
+clauses; source completion is distinguished from operator/device evidence.
+
+1. **Step 1 — partly done; underlying F1 defect fixed.** Codex conversion landed
+   in `9fff907`, Claude conversion/shared helper cleanup in `5001e41`. Existing
+   [1] is accepted and [3] awaits acceptance; neither is duplicated or moved.
+   Committed tests cover 0/1/100 and missing helper input, and both Claude
+   adapters/kinds; Codex tests exercise the helper rather than RPC adaptation.
+   This audit also checked 0/.5/1/2/100 through helper/compact pace and `u:1` at
+   1%. Adapter-level fractional-percentage, missing-field and compact boundary
+   regressions remain for [7]. Prototype normalization/historical marking remains
+   for [12]. Claude legacy units have recorded observational evidence in [3].
+   Live Codex comparison, deployed recollection and physical 1% display are not
+   established by the source or this audit; keep them as explicit operator checks,
+   with no magnitude-based rewriting of historical snapshots. Unit rules are
+   ready for Step 4 without waiting for those operator checks.
+2. **Step 2 — still open → [6].** Neither config HTML nor phone transport,
+   endpoint validation, blank-token/origin handling or independent recovery was
+   changed. No request-target/cancel/error/origin/recovery test set or physical
+   save/reopen/reinstall evidence was added. Unauthenticated `/config` already
+   works and is covered by the existing Python HTTP test; preserve it. Compatible
+   HTML-first rollout and existing-settings migration still need planning with
+   the implementation. Token exposure in actual logs remains unverified.
+3. **Step 3 — still open → [7].** Local Python regressions are useful partial
+   groundwork, but no CI behavior invocation, minimal Node runner or failing-test
+   release-block demonstration exists. CI already declares Python 3.12.3 for
+   tooling; it does not run collector tests on it. Existing PBW metadata checks
+   remain intact. Add behavior gates without introducing a testing framework.
+4. **Step 4 — still open → [8], depends on [7].** No shared normalized boundary,
+   per-window isolation, finite/range/shape/wire checks or loaded-state validation
+   exists. The successful-refresh fixture still uses `{"used": 1}`. Atomic rename
+   and previous-file preservation on some total failures already existed before
+   review, so are not new remediation. `658613c` intentionally allows cooldown
+   state to publish without windows and retains stale Claude windows even when
+   both collectors fail: the plan must preserve retry state while separately
+   defining usable quota publication. Missing/corrupt state handling is only
+   partial; disk-write and full malformed-input verification remain. Documentation
+   and HTTP damaged-state semantics must follow the chosen validation boundary.
+5. **Step 5 — partly done → [9], depends on [8].** `658613c` completes only the
+   Claude full-snapshot retention/error/timestamp portion. It does not implement
+   bounded freshness, Codex retention/unavailability, compact status/message keys,
+   stale watch rendering, expiry handling, current color/marker agreement or
+   temperature policy. Backoff tests cover Claude failure/cooldown/recovery at
+   host level, not the required end-to-end healthy/partial/total/offline/reset/
+   startup/future-time/temperature sequences. API-first additive rollout and
+   timestamp-preserving rollback remain requirements, not verified operations.
+6. **Step 6 — still open → [10], depends on [8].** RPC error/result validation,
+   timeout/EOF/JSON classification, reap/pipe cleanup and fake-server lifecycle
+   fixtures are absent. Preserve duration labels and the small subprocess design.
+   A tested live CLI version is not recorded. Adapter compatibility and sanitized
+   failure isolation remain unverified beyond source inspection.
+7. **Step 7 — still open → [11], depends on [8] and [9].** No stable capacity
+   priority, bounded identity policy, version/range/string validation, atomic
+   consumer replacement or reset/duration pairing check landed. All 0/1/5/6+,
+   malformed field/tuple, long scoped name and unequal-reset fixtures, five-row
+   2048-byte proof, key reconciliation and Emery five-unpaired/stale screenshots
+   remain. Keep these as acceptance checks rather than claiming that today's
+   packaging checks prove transport behavior. Compatibility/version/rollback
+   decisions remain with implementation.
+8. **Step 8 — partly done → [12].** Root README gained backoff/failure semantics
+   in `658613c`; full schema/sample/defaults/cadences, service/credential/state/
+   token/recovery runbook, single-writer policy, SDK reconciliation, historical
+   spike/calendar claims and release-retry verification remain. No deployment,
+   proxy isolation, offline setup/rebuild or actual release history was verified
+   here. Do not “repair” the manifest without that history. Dependent proposals
+   supply final behavior; simple factual documentation can be corrected earlier.
+
+### Lower-priority backlog verdicts
+
+- **Concurrent writers — still open, folded into [12].** `write_snapshot`
+  (316–320) still uses a fixed `.tmp`; no one-writer declaration or concurrency
+  test was added. Prefer documenting one writer; unique temporary files are
+  conditional on an actual supported overlap requirement.
+- **Temperature units — still open → [13].** `collect_temperature` (196–219)
+  still ignores unit/time metadata. Mocked tests and an explicit Celsius-only or
+  conversion policy are worthwhile before claiming support for other hosts.
+- **Phone ordering/retry — still open → [14].** JS `refresh` has neither an
+  in-flight/generation guard nor response-age comparison; AppMessage failure
+  only logs. This audit's delayed XHR fixture delivered at:200 then at:100 and
+  observed the older timestamp overwrite the newer one. Choose only the needed
+  ordering guard and bounded retry/deferred-refresh policy.
+- **HTTP scope — still open, folded into [8]/[12].** ThreadingHTTPServer remains
+  privately scoped by deployment assumption; 503 still returns raw exception
+  text. Sanitize diagnostics when repairing damaged-state handling and document
+  loopback/TLS constraints. No new framework or connection-limit subsystem is
+  justified by observed repository requirements.
+- **Release state/retries — still open as verification → [12].** Local package
+  0.2.0, manifest 0.1.0 and non-idempotent `gh release upload` remain unchanged.
+  No live release history was inspected; the mismatch is not proof of failure.
+- **Calendar portability — still open as documentation/evidence → [12].** No
+  committed harness exists and date code is unchanged. Retain useful tests if
+  ongoing guarantees are promised, otherwise mark the claim historical. There
+  is no evidence requiring a date algorithm rewrite.
+- **Persistence/performance — still open as a product decision; deferred.** No
+  watch cache or measurements were added. Five rows still do not justify loop or
+  file-read optimization. No implementation issue is filed without a demonstrated
+  offline-restart need or measured bottleneck; freshness work is already [9].
+
+No finding/step became obsolete. Prior source defects either remain or have
+explicit fixes; unverified operational claims are not reclassified as obsolete.
+
+### Post-review design inspection
+
+Inspected the complete `0d1d6f3..main` diff, especially `658613c`, `9fff907` and
+`5001e41`, using honey-review's duplication, speculative-generalization and
+shallow-interface criteria. **Zero new over-engineering/shallow-module findings.**
+`percent_fraction` centralizes a real provider unit rule; the small retry-delay
+function contains HTTP-date parsing and a bounded fallback policy; existing
+collector boundaries absorb cooldown without a new service/plugin framework.
+Their error handling and meaningful regressions are not bloat. The newly loaded
+snapshot's wrong-shape failure is additional F2 evidence, not a duplicate new
+finding. Stale host metadata disappearing on the wire is the remaining F3 work.
+
+### Verification and tracking
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v`:
+  **35 passed, 0 failed/errors/skips**, Python 3.14.7. Run once to substantiate
+  percentage and cooldown completion; this is not CI/device/deployment evidence.
+- Temporary Python assertions confirmed the additional percentage boundaries,
+  incomplete-window publication, cross-provider NaN failure, nonempty-array
+  loaded-state failure and unchanged expired 20% usage changing pace from -20 to
+  +80. A first exploratory script stopped on a mock-serialization error in its
+  empty-array case; the corrected wrong-root check mocked all three collectors
+  and proved none was called. The earlier percentage/publication checks passed.
+- Node VM/assert with synthetic localStorage, Pebble and XHR confirmed query token
+  transport, v99 acceptance, six-to-five truncation and reverse-order delivery.
+  No phone, C build or emulator tests were needed to establish unchanged source.
+- Created [6]–[14] via `hai-tasks create`, all labelled `steward` under
+  `Unverified proposals`, with acceptance criteria. Dependency bullets and YAML
+  frontmatter are maintained by hai-tasks; promotion/order belongs to the steward.
+  [7] includes Step 1's residual regression work, [12] its spike cleanup; existing
+  completed [1]–[4] and settings acceptance states are preserved. Device/live
+  checks stay explicitly unverified rather than spawning duplicate fix issues.
+- Tracker Rules name no dedicated checker. Validate via successful `hai-tasks read`,
+  reference/description/dependency consistency and `git diff --check`; only tracker
+  and documentation files belong in this delivery. No production deployment,
+  service restart, release publication or acceptance change is part of this audit.
+
+Proposal numbers in this section refer to `TASKS.md` and its linked descriptions.
+The nine proposals are candidates for steward prioritization, not ordered backlog
+commitments. The original plan's rollout/rollback caveats remain applicable.

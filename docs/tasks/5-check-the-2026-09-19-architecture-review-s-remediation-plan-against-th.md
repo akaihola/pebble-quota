@@ -37,3 +37,28 @@ of its steps are done.
    and dependencies, without duplicating completed percentage/backoff issues.
 4. Validate descriptions, links and the documentation-only diff; merge locally
    to main, remove the feature checkout/branch, and complete [5] pending acceptance.
+
+## Delivery and validation, 2026-10-19
+
+Appended `Status, 2026-10-19` to the original architecture report, preserving
+its previous text byte-for-byte. All eight findings, eight ordered steps and
+seven lower-priority entries have evidence-backed verdicts. F1 is fixed in
+production source (9fff907, 5001e41); Step 1 retains test/operator/documentation
+checks. F3/F8 are partly done; the other findings remain open. No obsolete or
+new over-engineering finding was warranted by the full post-review diff.
+
+Created nine steward-labelled candidates [6]–[14] with hai-tasks under
+Unverified proposals, including acceptance criteria and dependency bullets/YAML.
+Residual checks are included without reopening completed fixes or changing
+acceptance. A create request referencing not-yet-created dependencies [13]/[14]
+was rejected without a write; [12] was created with existing dependencies, then
+updated through hai-tasks after [13]/[14] existed. Fresh reads verified all nine.
+
+Validation: 35 unittest tests passed, zero failures/errors/skips; temporary
+Python and Node assertions support the remaining source-level defects as
+specified in the status section. No additional tests or runtime code were
+committed. `git diff --check`, hai-tasks read, description/reference checks,
+unique issue IDs, dependency frontmatter and preservation of all existing
+issue fields passed. Tracker Rules specify no separate checker. Merge locally
+to main and complete [5] with `[ ]`, leaving acceptance to the user/steward.
+No deployment, service restart, production release or push is included.
