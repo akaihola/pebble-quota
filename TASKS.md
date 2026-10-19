@@ -44,10 +44,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Scheduled
 
-- [13] Make temperature units and entity age explicit
-  <!-- hai:{"id":"simple-0df495bc-7407-4aec-a21b-301ab4b35cde","labels":["steward"],"createdAt":"2026-10-19T12:35:46.982Z","updatedAt":"2026-10-19T15:59:18.521Z"} -->
-
 ## In Progress
+
+- [~] [13] Make temperature units and entity age explicit
+      <!-- hai:{"id":"simple-0df495bc-7407-4aec-a21b-301ab4b35cde","labels":["steward"],"createdAt":"2026-10-19T12:35:46.982Z","updatedAt":"2026-10-19T15:59:30.927Z"} -->
 
 ## Completed / Accepted
 
