@@ -42,10 +42,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [15] Security scan of pebble-quota: provider tokens, outputs and history
-  <!-- hai:{"id":"simple-71337a70-182d-486f-9f51-1fd788aba3af","labels":["steward","security"],"createdAt":"2026-10-20T20:10:50.486Z","updatedAt":"2026-10-20T20:10:50.486Z"} -->
-
 ## Scheduled
+
+- [15] Security scan of pebble-quota: provider tokens, outputs and history
+  <!-- hai:{"id":"simple-71337a70-182d-486f-9f51-1fd788aba3af","labels":["steward","security"],"createdAt":"2026-10-20T20:10:50.486Z","updatedAt":"2026-10-20T20:44:29.358Z"} -->
 
 ## In Progress
 
