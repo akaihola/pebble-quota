@@ -33,3 +33,21 @@ Not in scope: F1's other steps (deleting the lock files, replacing the keys and 
   regression checks for every scoped finding and the build environment.
 - Run the collector suite, review the diff, merge into main, and complete this
   issue pending acceptance. Leave the running service untouched.
+
+## Validation
+
+- `python3 -m unittest discover -s tests -q`: 47 tests pass, including new
+  regressions for each scoped finding. The guard blocks external connections,
+  real credential reads and unapproved subprocesses; tests use temporary fakes.
+- `make -C watchface clean build`: passes with local SDK 4.17 and pebble-tool
+  5.0.39. The fake Pebble regression also verifies both recipes receive only
+  the four explicitly supplied environment variables.
+- The generated waf lock environment was checked by variable name only: no
+  `TOKEN`, `SECRET`, `KEY` or `PASS` names. SDK-added variables name SDK paths.
+- Existing watch-face compiler warnings (temperature formatting and an RWX
+  load segment) remain outside this issue.
+- `git diff --check`: passes. No live provider or credential was used and the
+  collector service was not restarted.
+- F1 covers build environment isolation only. Operator cleanup and key rotation
+  remain outstanding. The proposed nixos-config unit limit is outside this
+  repository; collector startup failures now stay within the refresh loop.

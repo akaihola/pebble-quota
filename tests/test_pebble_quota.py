@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import builtins
+import contextlib
+import io
+import socket
+import shutil
+import subprocess
+import sys
 import importlib.util
 import json
 import os
@@ -17,6 +24,69 @@ spec = importlib.util.spec_from_file_location("pebble_quota", MODULE_PATH)
 assert spec and spec.loader
 quota = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(quota)
+
+
+class LiveAccessError(BaseException):
+    """Must escape the collector's broad Exception handlers."""
+
+
+_TOOL_PATH = os.environ["PATH"]
+_REAL_POPEN = subprocess.Popen
+
+
+def setUpModule():
+    stack = contextlib.ExitStack()
+    unittest.addModuleCleanup(stack.close)
+    directories = []
+    real_mkdtemp = tempfile.mkdtemp
+
+    def mkdtemp(*args, **kwargs):
+        name = real_mkdtemp(*args, **kwargs)
+        directories.append(Path(name).resolve())
+        return name
+
+    stack.enter_context(mock.patch.object(tempfile, "mkdtemp", mkdtemp))
+    home = stack.enter_context(tempfile.TemporaryDirectory())
+    stack.enter_context(mock.patch.dict(os.environ, {"HOME": home, "PATH": os.defpath}, clear=True))
+
+    def guarded_open(original):
+        def open_file(file, *args, **kwargs):
+            if isinstance(file, (str, bytes, os.PathLike)):
+                path = Path(os.fsdecode(file))
+                if not path.is_absolute() and kwargs.get("dir_fd") is not None:
+                    path = Path(os.readlink(f"/proc/self/fd/{kwargs['dir_fd']}")) / path
+                path = path.resolve()
+                if ({".claude", ".codex"} & set(path.parts)
+                        and not any(path.is_relative_to(root) for root in directories)):
+                    raise LiveAccessError("test attempted real credential access")
+            return original(file, *args, **kwargs)
+        return open_file
+
+    stack.enter_context(mock.patch.object(builtins, "open", guarded_open(builtins.open)))
+    stack.enter_context(mock.patch.object(io, "open", guarded_open(io.open)))
+    stack.enter_context(mock.patch.object(os, "open", guarded_open(os.open)))
+    real_connect = socket.socket.connect
+    real_getaddrinfo = socket.getaddrinfo
+
+    def local_only(host):
+        if host not in ("127.0.0.1", "::1", "localhost"):
+            raise LiveAccessError("test attempted non-loopback network access")
+
+    def connect(sock, address):
+        if sock.family in (socket.AF_INET, socket.AF_INET6):
+            local_only(address[0])
+        return real_connect(sock, address)
+
+    def getaddrinfo(host, *args, **kwargs):
+        local_only(host)
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    def no_process(*args, **kwargs):
+        raise LiveAccessError("test must explicitly substitute a fake subprocess")
+
+    stack.enter_context(mock.patch.object(socket.socket, "connect", connect))
+    stack.enter_context(mock.patch.object(socket, "getaddrinfo", getaddrinfo))
+    stack.enter_context(mock.patch.object(subprocess, "Popen", no_process))
 
 
 class PaceTests(unittest.TestCase):
@@ -138,7 +208,7 @@ class ClaudeBackoffTests(unittest.TestCase):
             quota, "collect_codex", return_value={"service": "codex", "windows": {}}))
         self.enterContext(mock.patch.object(quota, "collect_temperature", return_value=222))
         self.http = self.enterContext(mock.patch.object(
-            quota.urllib.request, "urlopen",
+            quota, "provider_urlopen",
             side_effect=lambda *args, **kwargs: _FakeResponse(self.PAYLOAD)))
 
     def http_error(self, retry_after: str | None = None, code: int = 429) -> None:
@@ -366,7 +436,7 @@ class TemperatureTests(unittest.TestCase):
         }, clear=True))
         self.enterContext(mock.patch.object(quota.time, "time", return_value=self.NOW))
         self.urlopen = self.enterContext(mock.patch.object(
-            quota.urllib.request, "urlopen", return_value=_FakeResponse(self.STATE)))
+            quota, "provider_urlopen", return_value=_FakeResponse(self.STATE)))
 
     def test_supported_units_and_rounding(self) -> None:
         for unit, value, expected in (
@@ -533,7 +603,7 @@ class ClaudeCollectTests(unittest.TestCase):
                 {"claudeAiOauth": {"accessToken": "test-token"}}))
             with mock.patch.dict(os.environ, {"HOME": home}):
                 with mock.patch.object(
-                    quota.urllib.request, "urlopen", _urlopen_returning(payload)
+                    quota, "provider_urlopen", _urlopen_returning(payload)
                 ):
                     return quota.collect_claude()
 
@@ -584,6 +654,211 @@ class ClaudeCollectTests(unittest.TestCase):
         ]
         result = self._collect({"limits": limits})
         self.assertEqual(list(result["windows"]), ["5h", "7d", "7d (Fable)"])
+
+
+class SecurityTests(unittest.TestCase):
+    def test_guards_block_real_network_credentials_and_processes(self):
+        with self.assertRaises(LiveAccessError):
+            urllib.request.urlopen("https://provider.invalid/", timeout=1)
+        with self.assertRaises(LiveAccessError):
+            Path("/home/agent/.claude/.credentials.json").read_text()
+        with self.assertRaises(LiveAccessError):
+            quota.collect_codex()
+        with self.assertRaises(LiveAccessError):
+            with mock.patch.object(quota, "collect_claude", side_effect=LiveAccessError("blocked")):
+                quota.collect_all()
+
+    def test_snapshot_is_private_and_does_not_follow_fixed_temp_symlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            victim = Path(directory) / "victim"
+            victim.write_text("untouched")
+            output.with_suffix(".json.tmp").symlink_to(victim)
+            old_umask = os.umask(0o022)
+            try:
+                for value in (1, 2):
+                    quota.write_snapshot({"value": value}, output)
+                    self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+            finally:
+                os.umask(old_umask)
+            self.assertEqual(victim.read_text(), "untouched")
+            self.assertEqual(json.loads(output.read_text()), {"value": 2})
+            with mock.patch.object(quota.os, "replace", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    quota.write_snapshot({}, output)
+            self.assertEqual(sorted(p.name for p in Path(directory).iterdir()),
+                             ["latest.json", "latest.json.tmp", "victim"])
+
+    def test_codex_fake_receives_only_allowlisted_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            fake = home / "codex"
+            fake.write_text("#!" + sys.executable + "\n" +
+                "import json, os, sys\n"
+                "from pathlib import Path\n"
+                "Path(os.environ['HOME'], 'env.json').write_text(json.dumps(dict(os.environ)))\n"
+                "for line in sys.stdin:\n"
+                "    request = json.loads(line)\n"
+                "    if 'id' in request:\n"
+                "        print(json.dumps({'id': request['id'], 'result': {'primary': "
+                "{'usedPercent': 20, 'windowDurationMins': 300, 'resetsAt': 18000}}}), flush=True)\n")
+            fake.chmod(0o700)
+            env = {"HOME": directory, "PATH": directory, "CODEX_HOME": directory,
+                   "TERM": "dumb", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
+                   "HTTPS_PROXY": "http://fake.invalid", "PEBBLE_QUOTA_TOKEN": "fake",
+                   "HASS_TOKEN": "fake", "OPENAI_API_KEY": "fake", "OTHER_SECRET": "fake", "LC_API_KEY": "fake"}
+            def fake_codex(*args, **kwargs):
+                process = _REAL_POPEN(*args, **kwargs)
+                self.addCleanup(process.stdin.close)
+                self.addCleanup(process.stdout.close)
+                return process
+
+            with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(
+                    quota.subprocess, "Popen", fake_codex):
+                result = quota.collect_codex()
+            self.assertEqual(result["windows"]["5h"]["used_fraction"], .2)
+            child_env = json.loads((home / "env.json").read_text())
+            self.assertEqual(set(child_env), set(env) -
+                             {"PEBBLE_QUOTA_TOKEN", "HASS_TOKEN", "OPENAI_API_KEY", "OTHER_SECRET", "LC_API_KEY"})
+
+    def test_build_and_clean_scrub_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fake = root / "pebble"
+            fake.write_text("#!" + sys.executable + "\n" +
+                "import json, os, sys\n"
+                "from pathlib import Path\n"
+                "Path(sys.argv[1] + '.json').write_text(json.dumps(dict(os.environ)))\n")
+            fake.chmod(0o700)
+            makefile = Path(__file__).parents[1] / "watchface/Makefile"
+            env = {"HOME": directory, "PATH": directory + os.pathsep + _TOOL_PATH,
+                   "LANG": "C.UTF-8", "HASS_TOKEN": "fake", "BUILD_API_KEY": "fake"}
+            with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
+                subprocess.run([shutil.which("make", path=_TOOL_PATH), "-f", str(makefile),
+                                "SHELL=" + shutil.which("bash", path=_TOOL_PATH), "clean", "build"],
+                               cwd=directory, env=env, check=True, capture_output=True)
+            for command in ("clean", "build"):
+                captured = json.loads((root / (command + ".json")).read_text())
+                self.assertEqual(set(captured), {"HOME", "PATH", "LANG", "CC"})
+
+    def test_provider_redirects_are_refused(self):
+        seen = []
+
+        class Redirect(quota.BaseHTTPRequestHandler):
+            def do_GET(self):
+                seen.append(self.headers.get("Authorization"))
+                self.send_response(302)
+                self.send_header("Location", "http://other-provider.invalid/stolen")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = quota.ThreadingHTTPServer(("127.0.0.1", 0), Redirect)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        url = f"http://127.0.0.1:{server.server_port}"
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            (home / ".claude").mkdir()
+            (home / ".claude/.credentials.json").write_text(
+                json.dumps({"claudeAiOauth": {"accessToken": "fake"}}))
+            with mock.patch.dict(os.environ, {"HOME": directory, "HASS_TOKEN": "fake",
+                                              "HASS_SERVER": url}), mock.patch.object(
+                    quota, "CLAUDE_USAGE_URL", url):
+                for collector in (quota.collect_claude, quota.collect_temperature):
+                    with self.assertRaises(urllib.error.HTTPError) as error:
+                        collector()
+                    self.assertEqual(error.exception.code, 302)
+                    error.exception.close()
+        self.assertEqual(seen, ["Bearer fake", "Bearer fake"])
+        handler = quota.NoProviderRedirect()
+        for destination in ("https://other.invalid/", "http://origin.invalid/"):
+            self.assertIsNone(handler.redirect_request(
+                urllib.request.Request("https://origin.invalid/"), None, 302,
+                "Found", {}, destination))
+
+    def test_503_does_not_reflect_exception_in_response(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            output.write_text(json.dumps({"collected_at": "bad\r\nInjected: yes ☃"}))
+            server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+            server.snapshot, server.token = output, "fake"
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{server.server_port}/v1/watch",
+                    headers={"Authorization": "Bearer fake"})
+                with mock.patch.object(quota.sys, "stderr", new_callable=io.StringIO) as log:
+                    with self.assertRaises(urllib.error.HTTPError) as error:
+                        urllib.request.urlopen(request, timeout=2)
+                    self.assertEqual(error.exception.code, 503)
+                    self.assertEqual(error.exception.reason, "Snapshot unavailable")
+                    self.assertNotIn("Injected", error.exception.read().decode())
+                    self.assertIsNone(error.exception.headers.get("Injected"))
+                    error.exception.close()
+                    self.assertIn("ValueError", log.getvalue())
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+
+
+class StartupTests(unittest.TestCase):
+    def test_busy_port_does_not_collect(self):
+        server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+        self.addCleanup(server.server_close)
+        with mock.patch.dict(os.environ, {"PEBBLE_QUOTA_TOKEN": "fake"}), mock.patch.object(
+                sys, "argv", ["quota", "serve", "--port", str(server.server_port)]), mock.patch.object(
+                quota, "collect_all") as collect:
+            with self.assertRaises(OSError):
+                quota.main()
+            collect.assert_not_called()
+
+    def test_restarts_honour_persisted_attempts_including_total_failure(self):
+        for failed in (False, True):
+            with self.subTest(failed=failed), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "latest.json"
+                with mock.patch.object(quota, "utc_iso", return_value=quota.iso_from_epoch(1000)), \
+                     mock.patch.object(quota, "collect_claude") as claude, \
+                     mock.patch.object(quota, "collect_codex") as codex, \
+                     mock.patch.object(quota, "collect_temperature", return_value=None):
+                    for collector in (claude, codex):
+                        if failed:
+                            collector.side_effect = RuntimeError("offline")
+                        else:
+                            collector.return_value = {"windows": {"5h": {"used": 1}}}
+                    for _ in range(2):
+                        try:
+                            quota.refresh_snapshot(output, interval_seconds=300)
+                        except RuntimeError:
+                            self.assertTrue(failed)
+                    self.assertEqual(claude.call_count, 1)
+                    self.assertEqual(codex.call_count, 1)
+                    state = json.loads(output.read_text())
+                    for service in state["services"].values():
+                        self.assertEqual(service["last_attempt_at"], quota.iso_from_epoch(1000))
+
+    def test_write_failure_keeps_429_in_memory_and_waits_between_attempts(self):
+        stop = mock.Mock()
+        stop.is_set.return_value = False
+        stop.wait.side_effect = [False, False, True]
+        times = iter((1000, 1000, 1300, 1600, 1600))
+        error = urllib.error.HTTPError("https://fake.invalid", 429, "limited", {}, None)
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(quota, "utc_iso", side_effect=lambda: quota.iso_from_epoch(next(times))), \
+             mock.patch.object(quota, "collect_claude", side_effect=error) as claude, \
+             mock.patch.object(quota, "collect_codex", return_value={"windows": {}}) as codex, \
+             mock.patch.object(quota, "collect_temperature", return_value=None), \
+             mock.patch.object(quota, "write_snapshot", side_effect=OSError("disk full")), \
+             mock.patch.object(quota.sys, "stderr", new_callable=io.StringIO):
+            quota.refresh_forever(Path(directory) / "latest.json", 200, stop)
+        self.assertEqual(claude.call_count, 2)
+        self.assertEqual(codex.call_count, 3)
+        self.assertEqual(stop.wait.call_args_list, [mock.call(200)] * 3)
 
 
 if __name__ == "__main__":

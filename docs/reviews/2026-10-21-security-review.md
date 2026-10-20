@@ -70,6 +70,8 @@ GitHub has.
 
 ### F1. Build-environment snapshots expose secrets
 
+Fixed by [16].
+
 The Pebble SDK's waf records the whole process environment in
 `.lock-waf_<platform>_build` when `pebble build` configures. agent's environment
 carries every `environment.d` secret, so each build in [watchface/] writes those
@@ -129,6 +131,8 @@ Drafted issue:
     An operator confirms `coleaders` cannot read agent's checkouts.
 
 ### F2. Startup failures become a provider-polling loop
+
+Fixed by [16].
 
 `serve` collects from both providers before it binds its port, and any
 exception other than the "all collectors failed" `RuntimeError` ends the
@@ -230,6 +234,8 @@ Drafted issue for kandev-pacer's tracker:
 
 ### F4. Bearer tokens follow redirects
 
+Fixed by [16].
+
 `urllib.request` copies every header except content headers onto the redirected
 request, whatever the target host or scheme. This was confirmed in the installed
 Python 3.14's `HTTPRedirectHandler.redirect_request`.
@@ -317,6 +323,8 @@ hardcoded default, and check the physical phone's saved endpoint.
 
 ### F7. Codex inherits every service secret
 
+Fixed by [16].
+
 `collect_codex()` starts `codex app-server` with the full service environment
 ([collector/pebble_quota.py:141–149][collector]). On hopeli that includes
 `PEBBLE_QUOTA_TOKEN` from the unit's environment file, `HASS_TOKEN`, and every
@@ -340,6 +348,8 @@ Drafted issue:
 
 ### F8. Tests have no guard against live calls
 
+Fixed by [16].
+
 Every current test patches its network and subprocess access: synthetic
 credentials under a patched home, mocked `urlopen` and `collect_codex`, and
 servers on `127.0.0.1:0` ([tests/test_pebble_quota.py:123–142][tests]). The
@@ -356,6 +366,8 @@ rather than file a new issue. A `setUpModule` guard should make `urlopen`,
 
 ### F9. Snapshot privacy depends on the unit's umask
 
+Fixed by [16].
+
 `write_snapshot()` writes with the default mode through a fixed `latest.json.tmp`
 name ([collector/pebble_quota.py:337–341][collector]). Production is private only
 because the unit sets `UMask=0077`: the state directory is 0700 and the snapshot
@@ -370,6 +382,8 @@ temporary file with `tempfile.mkstemp` in the target directory, which gives mode
 0600 and a unique name, then `os.replace` it. Test the mode under umask 022.
 
 ### F10. 503 responses reflect exception text
+
+Fixed by [16].
 
 The handler passes `str(exc)` to `send_error(503, ...)`
 ([collector/pebble_quota.py:430–435][collector]). `http.server` HTML-escapes it
@@ -550,3 +564,5 @@ by location, pattern and shape only.
 [urgent]: #urgent-secrets-readable-outside-the-agent-account
 [history]: #history-scan
 [pacer-provider]: http://hopeli/prg/kandev-pacer/src/kandev_pacer/provider.py?f
+
+[16]: ../tasks/16-fix-the-collector-and-build-findings-of-the-2026-10-21-security-review.md
