@@ -42,10 +42,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [16] Fix the collector and build findings of the 2026-10-21 security review
-  <!-- hai:{"id":"simple-fbb27a76-39b2-4c99-9ed9-428c1553858c","labels":["steward"],"createdAt":"2026-10-20T22:25:33.272Z","updatedAt":"2026-10-20T22:25:33.272Z"} -->
-
 ## Scheduled
+
+- [16] Fix the collector and build findings of the 2026-10-21 security review
+  <!-- hai:{"id":"simple-fbb27a76-39b2-4c99-9ed9-428c1553858c","labels":["steward"],"createdAt":"2026-10-20T22:25:33.272Z","updatedAt":"2026-10-20T22:26:03.424Z"} -->
 
 ## In Progress
 
