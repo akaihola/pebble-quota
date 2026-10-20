@@ -42,6 +42,9 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [15] Security scan of pebble-quota: provider tokens, outputs and history
+  <!-- hai:{"id":"simple-71337a70-182d-486f-9f51-1fd788aba3af","labels":["steward","security"],"createdAt":"2026-10-20T20:10:50.486Z","updatedAt":"2026-10-20T20:10:50.486Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -76,7 +79,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -101,6 +104,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [13]: docs/tasks/13-make-temperature-units-and-entity-age-explicit.md
 
 [14]: docs/tasks/14-prevent-older-phone-responses-from-overwriting-newer-settings-or-data.md
+
+[15]: docs/tasks/15-security-scan-of-pebble-quota-provider-tokens-outputs-and-history.md
 
 ## Rules
 
