@@ -42,6 +42,9 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [16] Fix the collector and build findings of the 2026-10-21 security review
+  <!-- hai:{"id":"simple-fbb27a76-39b2-4c99-9ed9-428c1553858c","labels":["steward"],"createdAt":"2026-10-20T22:25:33.272Z","updatedAt":"2026-10-20T22:25:33.272Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -79,7 +82,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -106,6 +109,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [14]: docs/tasks/14-prevent-older-phone-responses-from-overwriting-newer-settings-or-data.md
 
 [15]: docs/tasks/15-security-scan-of-pebble-quota-provider-tokens-outputs-and-history.md
+
+[16]: docs/tasks/16-fix-the-collector-and-build-findings-of-the-2026-10-21-security-review.md
 
 ## Rules
 
