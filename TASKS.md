@@ -46,11 +46,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [17] Find what Claude's usage endpoint rate-limits on, from public sources and
-  our own records
-      <!-- hai:{"id":"simple-59034efe-5f31-4cbc-9291-ebfe54b0ab24","labels":["steward"],"createdAt":"2026-10-21T11:21:17.476Z","updatedAt":"2026-10-21T12:31:35.569Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [17] Find what Claude's usage endpoint rate-limits on, from public sources and
+  our own records
+      <!-- hai:{"id":"simple-59034efe-5f31-4cbc-9291-ebfe54b0ab24","labels":["steward"],"createdAt":"2026-10-21T11:21:17.476Z","updatedAt":"2026-10-21T12:36:18.160Z"} -->
 
 - [ ] [16] Fix the collector and build findings of the 2026-10-21 security review
       <!-- hai:{"id":"simple-fbb27a76-39b2-4c99-9ed9-428c1553858c","labels":["steward"],"createdAt":"2026-10-20T22:25:33.272Z","updatedAt":"2026-10-20T22:31:14.776Z"} -->
