@@ -12,3 +12,17 @@ Steward issue, 2026-10-21 14:00 tick. Goal: agentic-leverage (pebble-quota is ti
 
 - A sourced answer or a precise scope correction in [2]'s task file.
 - No requests beyond the collector's normal schedule; never exhaust a live credential to find the limit. No code change.
+
+## Plan
+
+1. Review official rate-limit documentation and firsthand public reports for
+   the exact OAuth usage endpoint; distinguish observations from guarantees.
+2. Read existing collector journal records and the steward quota history,
+   emitting only timestamps, status counts and scheduling evidence. Make no
+   live provider requests and read no credentials.
+3. Add a dated, sourced note to [the backoff task] with timing comparisons,
+   remaining uncertainty and a precise scope correction if the throttle key
+   cannot be established. Validate the documentation, merge locally, and
+   complete this research issue pending acceptance.
+
+[the backoff task]: 2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
