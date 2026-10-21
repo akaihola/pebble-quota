@@ -39,10 +39,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Scheduled
 
-- [8] Validate windows and loaded snapshots before publication
-  <!-- hai:{"id":"simple-ae2c788e-4c9e-4efd-841c-ee8f41766c5f","labels":["steward"],"createdAt":"2026-10-19T12:35:36.007Z","updatedAt":"2026-10-21T23:14:52.587Z"} -->
-
 ## In Progress
+
+- [~] [8] Validate windows and loaded snapshots before publication
+      <!-- hai:{"id":"simple-ae2c788e-4c9e-4efd-841c-ee8f41766c5f","labels":["steward"],"createdAt":"2026-10-19T12:35:36.007Z","updatedAt":"2026-10-21T23:15:05.499Z"} -->
 
 ## Completed / Accepted
 
