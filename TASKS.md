@@ -41,10 +41,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [8] Validate windows and loaded snapshots before publication
-      <!-- hai:{"id":"simple-ae2c788e-4c9e-4efd-841c-ee8f41766c5f","labels":["steward"],"createdAt":"2026-10-19T12:35:36.007Z","updatedAt":"2026-10-21T23:15:05.499Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [8] Validate windows and loaded snapshots before publication
+      <!-- hai:{"id":"simple-ae2c788e-4c9e-4efd-841c-ee8f41766c5f","labels":["steward"],"createdAt":"2026-10-19T12:35:36.007Z","updatedAt":"2026-10-21T23:25:33.882Z"} -->
 
 - [x] [17] Find what Claude's usage endpoint rate-limits on, from public sources and
   our own records
