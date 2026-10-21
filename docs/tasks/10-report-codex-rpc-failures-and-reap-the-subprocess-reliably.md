@@ -26,3 +26,17 @@ queue.Empty/EOF conceal causes and kill lacks a subsequent wait/pipe cleanup.
   Do not invoke authenticated Codex in tests; other provider rows remain deliverable.
 - Record the CLI version used for authorized compatibility verification in operations
   docs, or explicitly mark it unverified when only fakes were available.
+
+## Implementation plan
+
+- Validate initialize and rate-limit replies in the existing stdio adapter.
+  Ignore notifications while retaining one overall response deadline. Expose
+  fixed diagnostics for RPC failure, EOF, timeout, JSON and result errors.
+- Preserve duration labels and usable sibling windows. Accept explicit empty
+  window sets while rejecting malformed result containers.
+- Terminate, escalate to kill when needed, wait, and close the pipes on every
+  adapter exit. Exercise lifecycle and protocol paths with fake servers only.
+- Run the required full unittest suite, review the diff, merge into main and
+  complete the tracker pending acceptance. Leave compatibility explicitly
+  unverified in operations documentation; no authenticated provider calls or
+  service restart are authorized.
