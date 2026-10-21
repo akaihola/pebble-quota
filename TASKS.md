@@ -42,6 +42,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [17] Find what Claude's usage endpoint rate-limits on, from public sources and
+  our own records
+  <!-- hai:{"id":"simple-59034efe-5f31-4cbc-9291-ebfe54b0ab24","labels":["steward"],"createdAt":"2026-10-21T11:21:17.476Z","updatedAt":"2026-10-21T11:21:17.476Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -82,7 +86,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -111,6 +115,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [15]: docs/tasks/15-security-scan-of-pebble-quota-provider-tokens-outputs-and-history.md
 
 [16]: docs/tasks/16-fix-the-collector-and-build-findings-of-the-2026-10-21-security-review.md
+
+[17]: docs/tasks/17-find-what-claude-s-usage-endpoint-rate-limits-on-from-public-sources-a.md
 
 ## Rules
 
