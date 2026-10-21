@@ -55,6 +55,35 @@ format and includes the retained windows; the steward can still read both window
 and per-service errors. Consumers must use the service's `error` or `stale` field
 to distinguish retained windows from a fresh reading.
 
+Quota windows are validated individually on collection and every snapshot read.
+Usage must be a finite JSON number in `[0, 1]` (provider percentages in `[0, 100]`);
+strings, booleans and out-of-range values are rejected, never clamped. Reset times
+must be nonnegative integral Unix seconds or timezone-aware ISO 8601 timestamps,
+through `2147483647` seconds (the watch uses signed 32-bit values). ISO fractional
+seconds are truncated when encoded for the watch. Numeric strings and timestamps
+without timezones are rejected. Durations must be integer seconds from 1 through
+21,474,836, avoiding overflow in the watch's duration-times-100 calculation.
+Window labels must fit seven printable ASCII characters. The supported Claude
+model scope is Fable, encoded as service `F`, window `7d`; malformed or unsupported
+scopes are skipped. At most five validated rows are sent to the watch.
+
+Snapshots are untrusted: missing, corrupt or malformed containers and invalid
+scheduling fields are discarded without guessing replacement values. Healthy
+providers still run. Bad windows cannot suppress valid siblings. A refresh without usable rows
+retains prior validated quota and its collection time while persisting
+attempt/cooldown metadata; retained services carry `stale: true`. Atomic file
+replacement preserves the prior disk file on write failure, while the running
+collector retains scheduling state in memory. Persistent disk failure prevents
+restart guarantees until writes recover.
+
+A first 429 with no usable rows saves cooldown state but raises an unavailable
+reading error, as does total failure without previous quota. This scheduling-only
+state is not a successful publication. The authenticated HTTP endpoint returns
+503 `Snapshot unavailable` for missing, damaged or rowless snapshots (including
+cooldown-only state); valid rows in partially damaged snapshots remain available.
+Diagnostics in snapshots and logs contain fixed categories such as `HTTPError`
+rather than provider exception messages, URLs, response bodies or credentials.
+
 Outside temperature is a best-effort read of the Home Assistant entity `weather.forecast_koti` (met.no forecast for Koivusyrjä). It uses `HASS_TOKEN` (a Home Assistant long-lived token, kept outside the repo on `gogo`) and `HASS_SERVER` (default `http://localhost:8123`). A Home Assistant outage never blocks quota delivery: the temperature is simply omitted rather than reported as a fabricated value.
 
 The collector accepts only `attributes.temperature_unit` values `°C` and `°F`.

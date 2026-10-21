@@ -46,17 +46,115 @@ def iso_from_epoch(value: int | float | str | None) -> str | None:
     return datetime.fromtimestamp(float(value), timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def epoch(value: int | float | str | None) -> int | None:
-    if value is None:
+WATCH_INT_MAX = 2**31 - 1
+# The watch multiplies duration by 100 in signed 32-bit arithmetic.
+MAX_DURATION_SECONDS = WATCH_INT_MAX // 100
+DIAGNOSTICS = {"HTTPError", "URLError", "TimeoutError", "RuntimeError", "OSError",
+               "ValueError", "JSONDecodeError", "Invalid quota windows", "Quota unavailable"}
+
+
+def epoch(value: Any) -> int | None:
+    """An integral, nonnegative watch timestamp, or None; never guess a timezone."""
+    try:
+        if type(value) in (int, float):
+            seconds = value
+        elif isinstance(value, str):
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                return None
+            seconds = parsed.timestamp()
+        else:
+            return None
+        if 0 <= seconds <= WATCH_INT_MAX and (isinstance(value, str) or int(seconds) == seconds):
+            return int(seconds)
+    except (ValueError, OverflowError, OSError):
+        pass
+    return None
+
+
+def percent_fraction(value: Any) -> float | None:
+    """Provider percentages must be JSON numbers, never numeric strings/bools."""
+    if type(value) not in (int, float) or not 0 <= value <= 100:
         return None
-    if isinstance(value, (int, float)) or value.isdigit():
-        return int(float(value))
-    return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
+    return value / 100.0
 
 
-def percent_fraction(value: int | float | None) -> float | None:
-    """Convert a 0-100 percentage to a fraction; 1 means 1%, never 100%."""
-    return None if value is None else float(value) / 100.0
+def diagnostic(error: Exception) -> str:
+    name = type(error).__name__
+    return name if name in DIAGNOSTICS else "Quota unavailable"
+
+
+def normalize_window(name: str, label: Any, item: Any) -> dict[str, Any] | None:
+    if not isinstance(label, str) or not isinstance(item, dict):
+        return None
+    watch_label = "7d" if name == "claude" and label == "7d (Fable)" else label
+    if not (1 <= len(watch_label) <= 7 and watch_label.isascii()
+            and all(32 <= ord(c) <= 126 for c in watch_label)):
+        return None
+    used, duration = item.get("used_fraction"), item.get("duration_seconds")
+    reset = epoch(item.get("resets_at"))
+    if (type(used) not in (int, float) or not 0 <= used <= 1
+            or reset is None or type(duration) is not int
+            or not 1 <= duration <= MAX_DURATION_SECONDS):
+        return None
+    return {"used_fraction": used, "resets_at": reset, "duration_seconds": duration}
+
+
+def normalize_snapshot(data: Any) -> dict[str, Any]:
+    """Untrusted disk/provider input -> usable rows and safe scheduling metadata."""
+    if not isinstance(data, dict):
+        data = {}
+    result: dict[str, Any] = {"services": {}}
+    if epoch(data.get("collected_at")) is not None:
+        result["collected_at"] = data["collected_at"]
+    services = data.get("services")
+    if not isinstance(services, dict):
+        services = {}
+    for name in ("claude", "codex"):
+        source = services.get(name)
+        if not isinstance(source, dict):
+            continue
+        service: dict[str, Any] = {}
+        result["services"][name] = service
+        if source.get("service") == name:
+            service["service"] = name
+        for field in ("last_attempt_at", "last_success_at", "retry_at"):
+            if epoch(source.get(field)) is not None:
+                service[field] = source[field]
+        failures = source.get("rate_limit_failures")
+        if type(failures) is int and 0 < failures <= WATCH_INT_MAX:
+            service["rate_limit_failures"] = failures
+        if "error" in source:
+            error = source["error"]
+            service["error"] = error if isinstance(error, str) and error in DIAGNOSTICS else "Quota unavailable"
+        if source.get("stale") is True:
+            service["stale"] = True
+        age = source.get("age_seconds")
+        if type(age) is int and 0 <= age <= WATCH_INT_MAX:
+            service["age_seconds"] = age
+        windows = source.get("windows")
+        if not isinstance(windows, dict):
+            continue
+        valid = {}
+        for label, item in windows.items():
+            if window := normalize_window(name, label, item):
+                valid[label] = window
+        if valid:
+            service["windows"] = valid
+    tenths = data.get("temperature_c_tenths")
+    if type(tenths) is int and -WATCH_INT_MAX <= tenths <= WATCH_INT_MAX:
+        result["temperature_c_tenths"] = tenths
+    if "temperature_error" in data:
+        error = data["temperature_error"]
+        result["temperature_error"] = error if isinstance(error, str) and error in DIAGNOSTICS else "Quota unavailable"
+    return result
+
+
+def load_snapshot(output: Path) -> dict[str, Any]:
+    try:
+        return normalize_snapshot(json.loads(output.read_text()))
+    except (OSError, ValueError):
+        return normalize_snapshot({})
 
 
 def pace_points(used_fraction: float, resets_at: int, duration_seconds: int, now: int) -> int:
@@ -83,7 +181,7 @@ def claude_windows_from_limits(limits: Any) -> dict[str, Any]:
     cannot be placed on a burn line. Unknown kinds are skipped.
     """
     windows: dict[str, Any] = {}
-    for limit in limits or []:
+    for limit in limits if isinstance(limits, list) else []:
         if not isinstance(limit, dict):
             continue
         percent = limit.get("percent")
@@ -91,21 +189,32 @@ def claude_windows_from_limits(limits: Any) -> dict[str, Any]:
         if percent is None or not resets_at:
             continue
         kind = limit.get("kind")
+        if not isinstance(kind, str):
+            continue
         if kind in CLAUDE_LIMIT_WINDOWS:
+            if limit.get("scope") is not None:
+                continue
             name, seconds = CLAUDE_LIMIT_WINDOWS[kind]
         elif kind == "weekly_scoped":
-            scope = (limit.get("scope") or {}).get("model") or {}
+            scope = limit.get("scope")
+            if not isinstance(scope, dict) or not isinstance(scope.get("model"), dict):
+                continue
+            scope = scope["model"]
+            if scope.get("display_name") != "Fable":
+                continue
             name, seconds = (
                 f"7d ({scope.get('display_name') or 'model'})",
                 CLAUDE_SCOPED_DURATION,
             )
         else:
             continue
-        windows[name] = {
+        window = normalize_window("claude", name, {
             "used_fraction": percent_fraction(percent),
             "resets_at": resets_at,
             "duration_seconds": seconds,
-        }
+        })
+        if window:
+            windows[name] = window
     return windows
 
 
@@ -134,6 +243,8 @@ def collect_claude() -> dict[str, Any]:
     )
     with provider_urlopen(request, timeout=15) as response:
         raw = json.load(response)
+    if not isinstance(raw, dict):
+        return {"service": "claude", "windows": {}}
     if windows := claude_windows_from_limits(raw.get("limits")):
         return {"service": "claude", "windows": windows}
     windows = {}
@@ -141,7 +252,7 @@ def collect_claude() -> dict[str, Any]:
         ("five_hour", "5h", 18_000),
         ("seven_day", "7d", 604_800),
     ):
-        if item := raw.get(source):
+        if isinstance(item := raw.get(source), dict):
             windows[name] = {
                 "used_fraction": percent_fraction(item.get("utilization")),
                 "resets_at": item.get("resets_at"),
@@ -194,16 +305,22 @@ def collect_codex() -> dict[str, Any]:
                 result = message.get("result", {})
                 limits = result.get("rateLimits", result)
                 windows = {}
+                if not isinstance(limits, dict):
+                    return {"service": "codex", "windows": windows}
                 for source in ("primary", "secondary"):
-                    if not (item := limits.get(source)):
+                    if not isinstance(item := limits.get(source), dict):
                         continue
                     minutes = item.get("windowDurationMins")
-                    name = DURATIONS.get(minutes, f"{minutes}m" if minutes else source)
-                    windows[name] = {
+                    if type(minutes) is not int or not 1 <= minutes <= MAX_DURATION_SECONDS // 60:
+                        continue
+                    name = DURATIONS.get(minutes, f"{minutes}m")
+                    window = normalize_window("codex", name, {
                         "used_fraction": percent_fraction(item.get("usedPercent")),
-                        "resets_at": iso_from_epoch(item.get("resetsAt")),
-                        "duration_seconds": int(minutes * 60) if minutes else None,
-                    }
+                        "resets_at": item.get("resetsAt"),
+                        "duration_seconds": minutes * 60,
+                    })
+                    if window:
+                        windows[name] = window
                 return {"service": "codex", "windows": windows}
         raise TimeoutError("Codex app-server did not return rate limits")
     finally:
@@ -281,7 +398,7 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
     output: dict[str, Any] = {"collected_at": utc_iso(), "services": {}}
     now = epoch(output["collected_at"])
     assert now is not None
-    previous = previous or {}
+    previous = normalize_snapshot(previous)
     old_claude = previous.get("services", {}).get("claude", {})
     collectors: tuple[tuple[str, Callable[[], dict[str, Any]]], ...] = (
         ("claude", collect_claude), ("codex", collect_codex)
@@ -298,11 +415,14 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
         if before_attempt is not None:
             before_attempt(name, output["collected_at"])
         try:
-            output["services"][name] = collector()
+            output["services"][name] = normalize_snapshot(
+                {"services": {name: collector()}})["services"].get(name, {})
+            if not output["services"][name].get("windows"):
+                output["services"][name]["error"] = "Invalid quota windows"
             if name == "claude" and output["services"][name].get("windows"):
                 output["services"][name]["last_success_at"] = output["collected_at"]
         except Exception as exc:
-            service = {"service": name, "error": f"{type(exc).__name__}: {exc}"}
+            service = {"service": name, "error": diagnostic(exc)}
             output["services"][name] = service
             if name == "claude" and isinstance(exc, urllib.error.HTTPError) and exc.code == 429:
                 failures = old_claude.get("rate_limit_failures", 0) + 1
@@ -326,7 +446,7 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
     try:
         tenths = collect_temperature()
     except Exception as exc:
-        output["temperature_error"] = f"{type(exc).__name__}: {exc}"
+        output["temperature_error"] = diagnostic(exc)
     else:
         if tenths is not None:
             output["temperature_c_tenths"] = tenths
@@ -334,6 +454,7 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
 
 
 def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any]:
+    data = normalize_snapshot(data)
     now = int(time.time()) if now is None else now
     rows = []
     service_codes = {"claude": "C", "codex": "X"}
@@ -356,7 +477,7 @@ def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any
                 "d": duration,
                 "p": pace_points(used, reset, duration, now),
             })
-    result: dict[str, Any] = {"v": 1, "at": epoch(data.get("collected_at")), "q": rows}
+    result: dict[str, Any] = {"v": 1, "at": epoch(data.get("collected_at")), "q": rows[:5]}
     tenths = data.get("temperature_c_tenths")
     if isinstance(tenths, int):
         result["t"] = tenths  # outside temperature, integer tenths of degC
@@ -369,61 +490,67 @@ def write_snapshot(data: dict[str, Any], output: Path) -> None:
     temporary = Path(name)
     try:
         with os.fdopen(fd, "w") as stream:
-            json.dump(data, stream, indent=2, sort_keys=True)
+            json.dump(data, stream, indent=2, sort_keys=True, allow_nan=False)
             stream.write("\n")
         os.replace(temporary, output)
     finally:
         temporary.unlink(missing_ok=True)
 
 
-def has_quota_data(data: dict[str, Any]) -> bool:
-    services = data.get("services", {})
-    return any(service.get("windows") for service in services.values())
+def has_quota_data(data: Any) -> bool:
+    return any(service.get("windows")
+               for service in normalize_snapshot(data)["services"].values())
 
 
 def refresh_snapshot(output: Path, previous: dict[str, Any] | None = None,
                      interval_seconds: int = 0) -> dict[str, Any]:
-    if previous is None:
-        try:
-            previous = json.loads(output.read_text())
-        except (FileNotFoundError, ValueError):
-            previous = {}
+    state = load_snapshot(output) if previous is None else normalize_snapshot(previous)
 
     def before_attempt(name: str, attempted_at: str) -> None:
-        previous.setdefault("services", {}).setdefault(name, {})["last_attempt_at"] = attempted_at
+        state["services"].setdefault(name, {})["last_attempt_at"] = attempted_at
         # Persist before contacting a provider so a restart retains the rate limit.
         try:
-            write_snapshot(previous, output)
+            write_snapshot(state, output)
         except OSError as error:
-            print(f"attempt persistence failed: {type(error).__name__}: {error}",
-                  file=sys.stderr, flush=True)
+            print(f"attempt persistence failed: {diagnostic(error)}", file=sys.stderr, flush=True)
 
     if interval_seconds:
-        data = collect_all(previous, interval_seconds, before_attempt)
+        data = normalize_snapshot(collect_all(state, interval_seconds, before_attempt))
     else:
-        data = collect_all(previous)
-    previous.clear()
-    previous.update(data)
-    # Persist a cooldown even on the first failed read, when no windows exist yet.
-    if not has_quota_data(data) and not data["services"].get("claude", {}).get("retry_at"):
-        if output.exists():
-            raise RuntimeError("all quota collectors failed; preserving previous snapshot")
-        raise RuntimeError("all quota collectors failed; no snapshot available")
+        data = normalize_snapshot(collect_all(state))
+    available = has_quota_data(data)
+    retained = has_quota_data(state)
+    if not available:
+        # Retain quota and its collection time, while still saving attempt/cooldown
+        # metadata. A scheduling-only snapshot is never a successful quota read.
+        for name, service in data["services"].items():
+            old = state["services"].setdefault(name, {})
+            old.update(service)
+            if old.get("windows"):
+                old["stale"] = True
+                last_success = old.get("last_success_at", state.get("collected_at"))
+                if epoch(last_success) is not None:
+                    old["last_success_at"] = last_success
+                    old["age_seconds"] = max(0, (epoch(data.get("collected_at")) or 0)
+                                             - epoch(last_success))
+        data = state
+    if previous is not None:
+        previous.clear()
+        previous.update(data)  # Keep cooldown in memory even when disk writes fail.
     write_snapshot(data, output)
+    if not available:
+        message = "preserving previous snapshot" if retained else "no snapshot available"
+        raise RuntimeError(f"all quota collectors failed; {message}")
     return data
 
 
 def refresh_forever(output: Path, interval_seconds: int, stop: threading.Event) -> None:
-    try:
-        previous = json.loads(output.read_text())
-    except (OSError, ValueError) as error:
-        previous = {}
-        print(f"snapshot load failed: {type(error).__name__}: {error}", file=sys.stderr, flush=True)
+    previous = load_snapshot(output)
     while not stop.is_set():
         try:
             refresh_snapshot(output, previous, interval_seconds)
         except Exception as error:
-            print(f"quota refresh failed: {type(error).__name__}: {error}", file=sys.stderr, flush=True)
+            print(f"quota refresh failed: {diagnostic(error)}", file=sys.stderr, flush=True)
         if stop.wait(interval_seconds):
             break
 
@@ -488,9 +615,11 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
                 return
             try:
                 data = json.loads(self.server.snapshot.read_text())  # type: ignore[attr-defined]
+                if not has_quota_data(data) or epoch(data.get("collected_at")) is None:
+                    raise ValueError("Snapshot unavailable")
                 body = json.dumps(compact_watch(data), separators=(",", ":")).encode()
             except Exception as exc:
-                print(f"snapshot response failed: {type(exc).__name__}: {exc}",
+                print(f"snapshot response failed: {diagnostic(exc)}",
                       file=sys.stderr, flush=True)
                 self.send_error(503, "Snapshot unavailable")
                 return

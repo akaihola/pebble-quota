@@ -159,7 +159,7 @@ class RefreshTests(unittest.TestCase):
     def test_refresh_collects_and_atomically_writes_snapshot(self) -> None:
         expected = {
             "collected_at": "1970-01-01T00:00:00Z",
-            "services": {"claude": {"windows": {"5h": {"used": 1}}}},
+            "services": {"claude": {"windows": {"5h": {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}}}},
         }
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "state/latest.json"
@@ -172,7 +172,7 @@ class RefreshTests(unittest.TestCase):
     def test_total_failure_preserves_previous_snapshot(self) -> None:
         previous = {
             "collected_at": "1970-01-01T00:00:00Z",
-            "services": {"claude": {"windows": {"5h": {"used": 1}}}},
+            "services": {"claude": {"windows": {"5h": {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}}}},
         }
         failed = {
             "collected_at": "1970-01-01T00:05:00Z",
@@ -187,7 +187,9 @@ class RefreshTests(unittest.TestCase):
             with mock.patch.object(quota, "collect_all", return_value=failed):
                 with self.assertRaisesRegex(RuntimeError, "preserving previous"):
                     quota.refresh_snapshot(output)
-            self.assertEqual(json.loads(output.read_text()), previous)
+            saved = json.loads(output.read_text())
+            self.assertEqual(saved["collected_at"], previous["collected_at"])
+            self.assertEqual(saved["services"]["claude"]["windows"], previous["services"]["claude"]["windows"])
 
 
 class ClaudeBackoffTests(unittest.TestCase):
@@ -220,7 +222,12 @@ class ClaudeBackoffTests(unittest.TestCase):
             headers, None)
 
     def refresh(self) -> dict:
-        return quota.refresh_snapshot(self.output)["services"]["claude"]
+        try:
+            data = quota.refresh_snapshot(self.output)
+        except RuntimeError:
+            data = json.loads(self.output.read_text())
+            self.assertFalse(quota.has_quota_data(data))
+        return data["services"]["claude"]
 
     def test_429_keeps_windows_and_persists_cooldown_until_recovery(self) -> None:
         good = self.refresh()
@@ -248,7 +255,7 @@ class ClaudeBackoffTests(unittest.TestCase):
         self.assertEqual(quota.compact_watch(snapshot, now=self.now)["q"][0]["u"], 20)
         # The steward's existing errors and windows comprehensions still work.
         self.assertEqual({name: data["error"] for name, data in snapshot["services"].items()
-                          if "error" in data}, {"claude": stale["error"]})
+                          if "error" in data}, {"claude": stale["error"], "codex": "Invalid quota windows"})
         self.assertEqual([label for data in snapshot["services"].values()
                           for label in data.get("windows", {})], ["5h"])
         self.now = 1500
@@ -282,7 +289,7 @@ class ClaudeBackoffTests(unittest.TestCase):
         result = self.refresh()
         self.assertTrue(result["stale"])
         self.assertEqual(result["age_seconds"], 300)
-        self.assertIn("offline", json.loads(self.output.read_text())["services"]["codex"]["error"])
+        self.assertEqual("RuntimeError", json.loads(self.output.read_text())["services"]["codex"]["error"])
 
     def test_http_date_retry_after(self) -> None:
         self.http_error("Thu, 01 Jan 1970 02:00:00 GMT")
@@ -315,7 +322,7 @@ class ClaudeBackoffTests(unittest.TestCase):
 
     def test_old_snapshot_gets_original_reading_age_on_other_errors(self) -> None:
         previous = {"collected_at": quota.iso_from_epoch(0), "services": {
-            "claude": {"windows": {"5h": {"used_fraction": 0.2}}}}}
+            "claude": {"windows": {"5h": {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}}}}}
         self.output.write_text(json.dumps(previous))
         self.now = 300
         self.http_error(code=503)
@@ -330,17 +337,17 @@ class ClaudeBackoffTests(unittest.TestCase):
         self.assertEqual(result["age_seconds"], 600)
 
     def test_codex_continues_refreshing_while_claude_has_no_reading(self) -> None:
-        self.codex.return_value = {"windows": {"5h": {"used_fraction": 0.1}}}
+        self.codex.return_value = {"windows": {"5h": {"used_fraction": 0.1, "resets_at": 1000, "duration_seconds": 100}}}
         self.http_error("900")
         first = self.refresh()
         self.assertNotIn("windows", first)
         self.now = 300
-        self.codex.return_value = {"windows": {"5h": {"used_fraction": 0.2}}}
+        self.codex.return_value = {"windows": {"5h": {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}}}
         self.http.reset_mock()
         self.refresh()
         self.http.assert_not_called()
         self.assertEqual(json.loads(self.output.read_text())["services"]["codex"],
-                         self.codex.return_value)
+                         dict(self.codex.return_value, last_attempt_at=quota.iso_from_epoch(300)))
 
 
 class HttpTests(unittest.TestCase):
@@ -368,7 +375,7 @@ class HttpTests(unittest.TestCase):
     def test_watch_endpoint_requires_bearer_token(self) -> None:
         snapshot = {
             "collected_at": "1970-01-01T00:00:00Z",
-            "services": {"claude": {"windows": {}}},
+            "services": {"claude": {"windows": {"5h": {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}}}},
         }
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
@@ -830,7 +837,7 @@ class StartupTests(unittest.TestCase):
                         if failed:
                             collector.side_effect = RuntimeError("offline")
                         else:
-                            collector.return_value = {"windows": {"5h": {"used": 1}}}
+                            collector.return_value = {"windows": {"5h": {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}}}
                     for _ in range(2):
                         try:
                             quota.refresh_snapshot(output, interval_seconds=300)
@@ -859,6 +866,198 @@ class StartupTests(unittest.TestCase):
         self.assertEqual(claude.call_count, 2)
         self.assertEqual(codex.call_count, 3)
         self.assertEqual(stop.wait.call_args_list, [mock.call(200)] * 3)
+
+
+class ValidationTests(unittest.TestCase):
+    WINDOW = {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}
+
+    def snapshot(self, windows=None, name="claude"):
+        return {"collected_at": quota.iso_from_epoch(0), "services": {
+            name: {"windows": {"5h": self.WINDOW} if windows is None else windows}}}
+
+    def test_bad_windows_are_rejected_individually_for_both_providers(self):
+        invalid = [None, [], {}, {"used": 1}]
+        for field, values in {
+            "used_fraction": [None, True, "0.2", float("nan"), float("inf"),
+                              -float("inf"), -0.01, 1.01, 10**400],
+            "resets_at": [None, True, [], {}, "1000", "bad", "2026-10-22",
+                          "2026-10-22T00:00:00", float("nan"), float("inf"),
+                          -1, 1.5, quota.WATCH_INT_MAX + 1],
+            "duration_seconds": [None, True, "100", 0, -1, 1.5, float("nan"),
+                                 float("inf"), quota.MAX_DURATION_SECONDS + 1],
+        }.items():
+            invalid.extend(dict(self.WINDOW, **{field: value}) for value in values)
+            invalid.append({key: value for key, value in self.WINDOW.items() if key != field})
+        for name in ("claude", "codex"):
+            for window in invalid:
+                with self.subTest(name=name, window=window):
+                    data = self.snapshot({"5h": self.WINDOW, "7d": window}, name)
+                    self.assertTrue(quota.has_quota_data(data))
+                    rows = quota.compact_watch(data, now=950)["q"]
+                    self.assertEqual(len(rows), 1)
+                    self.assertEqual(rows[0]["w"], "5h")
+                    self.assertFalse(quota.has_quota_data(self.snapshot({"7d": window}, name)))
+
+    def test_shapes_labels_and_watch_bounds(self):
+        for data in (None, [], [1], "bad", {}, {"services": []},
+                     {"services": {"claude": []}},
+                     self.snapshot([]), self.snapshot({"5h": []})):
+            with self.subTest(data=data):
+                self.assertFalse(quota.has_quota_data(data))
+                self.assertEqual(quota.compact_watch(data)["q"], [])
+        for label in ("", "12345678", "é", "bad\n", 5):
+            self.assertFalse(quota.has_quota_data(self.snapshot({label: self.WINDOW})))
+        for used in (0, 1):
+            data = self.snapshot({"1234567": dict(self.WINDOW, used_fraction=used,
+                resets_at=quota.WATCH_INT_MAX, duration_seconds=quota.MAX_DURATION_SECONDS)})
+            self.assertTrue(quota.has_quota_data(data))
+            json.dumps(quota.compact_watch(data), allow_nan=False)
+        for percent in ("20", True, float("nan"), float("inf"), -1, 101):
+            self.assertIsNone(quota.percent_fraction(percent))
+
+    def test_claude_malformed_scopes_and_duplicate_windows(self):
+        good = {"kind": "session", "percent": 20, "resets_at": 1000}
+        malformed = [None, [], {}, {"kind": []}, dict(good, percent="20"),
+                     dict(good, resets_at="bad"), dict(good, scope=[])]
+        for scope in (None, [], "bad", {"model": []}, {"model": {}},
+                      {"model": {"display_name": []}},
+                      {"model": {"display_name": "Unknown"}}):
+            malformed.append(dict(good, kind="weekly_scoped", scope=scope))
+        self.assertEqual(quota.claude_windows_from_limits([good, *malformed]),
+                         {"5h": dict(self.WINDOW, duration_seconds=18000)})
+        for limits in (1, "bad", {"kind": "session"}):
+            self.assertEqual(quota.claude_windows_from_limits(limits), {})
+
+    def test_codex_malformed_primary_does_not_block_secondary(self):
+        good = {"usedPercent": 20, "resetsAt": 1000, "windowDurationMins": 300}
+        for primary in (None, [], "bad", {}, dict(good, resetsAt="bad"),
+                        dict(good, usedPercent="20"), dict(good, windowDurationMins=[])):
+            with self.subTest(primary=primary):
+                process = mock.Mock(stdin=io.StringIO(), stdout=io.StringIO(json.dumps({
+                    "id": 2, "result": {"rateLimits": {"primary": primary,
+                                                         "secondary": good}}}) + "\n"))
+                with mock.patch.object(quota.subprocess, "Popen", return_value=process):
+                    data = quota.collect_codex()
+                self.assertEqual(data["windows"], {"5h": dict(self.WINDOW, duration_seconds=18000)})
+
+    def test_damaged_disk_state_cannot_block_healthy_collection(self):
+        states = [None, "{broken", "[1]", "null", '"bad"', '{"services": []}',
+                  '{"services": {"claude": {"last_attempt_at": [], "retry_at": {},'
+                  '"rate_limit_failures": "bad", "windows": []}, "codex": []}}']
+        for state in states:
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "latest.json"
+                if state is not None:
+                    output.write_text(state)
+                with mock.patch.object(quota, "collect_claude", return_value={"windows": {}}) as claude, \
+                     mock.patch.object(quota, "collect_codex", return_value={"windows": {"5h": self.WINDOW}}) as codex, \
+                     mock.patch.object(quota, "collect_temperature", return_value=None):
+                    result = quota.refresh_snapshot(output, interval_seconds=300)
+                claude.assert_called_once()
+                codex.assert_called_once()
+                self.assertTrue(quota.has_quota_data(result))
+
+    def test_invalid_refresh_retains_good_codex_and_first_429_cooldown(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            good = self.snapshot(name="codex")
+            quota.write_snapshot(good, output)
+            error = urllib.error.HTTPError("https://fake.invalid", 429, "secret", {}, None)
+            with mock.patch.object(quota, "utc_iso", return_value=quota.iso_from_epoch(300)), \
+                 mock.patch.object(quota, "collect_claude", side_effect=error) as claude, \
+                 mock.patch.object(quota, "collect_codex", return_value={"windows": {"5h": {"used": 1}}}) as codex, \
+                 mock.patch.object(quota, "collect_temperature", return_value=None):
+                with self.assertRaisesRegex(RuntimeError, "preserving previous"):
+                    quota.refresh_snapshot(output, interval_seconds=300)
+                self.assertEqual(json.loads(output.read_text())["collected_at"], good["collected_at"])
+                quota.refresh_snapshot(output, interval_seconds=300)
+                claude.assert_called_once()
+                codex.assert_called_once()
+            saved = json.loads(output.read_text())
+            self.assertEqual(saved["services"]["codex"]["windows"], good["services"]["codex"]["windows"])
+            self.assertEqual(quota.epoch(saved["services"]["claude"]["retry_at"]), 900)
+            self.assertNotIn("secret", output.read_text())
+
+    def test_all_invalid_refresh_over_good_state_retains_quota(self):
+        for name in ("claude", "codex"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "latest.json"
+                good = self.snapshot(name=name)
+                quota.write_snapshot(good, output)
+                invalid = {"windows": {"5h": dict(self.WINDOW, used_fraction=float("nan"))}}
+                with mock.patch.object(quota, "collect_claude", return_value=invalid), \
+                     mock.patch.object(quota, "collect_codex", return_value=invalid), \
+                     mock.patch.object(quota, "collect_temperature", return_value=None):
+                    try:
+                        quota.refresh_snapshot(output)
+                    except RuntimeError:
+                        self.assertEqual(name, "codex")
+                saved = json.loads(output.read_text())
+                self.assertEqual(saved["services"][name]["windows"], good["services"][name]["windows"])
+                self.assertTrue(saved["services"][name]["stale"])
+                self.assertEqual(saved["services"][name]["error"], "Invalid quota windows")
+                self.assertEqual(len(quota.compact_watch(saved)["q"]), 1)
+
+    def test_first_429_without_rows_is_unavailable_but_survives_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            error = urllib.error.HTTPError("https://fake.invalid", 429, "secret", {}, None)
+            with mock.patch.object(quota, "utc_iso", return_value=quota.iso_from_epoch(300)), \
+                 mock.patch.object(quota, "collect_claude", side_effect=error) as claude, \
+                 mock.patch.object(quota, "collect_codex", side_effect=RuntimeError("secret")) as codex, \
+                 mock.patch.object(quota, "collect_temperature", return_value=None):
+                for _ in range(2):
+                    with self.assertRaisesRegex(RuntimeError, "no snapshot available"):
+                        quota.refresh_snapshot(output, interval_seconds=300)
+                claude.assert_called_once()
+                codex.assert_called_once()
+            self.assertFalse(quota.has_quota_data(json.loads(output.read_text())))
+
+    def test_atomic_replace_failure_leaves_good_disk_and_new_memory_cooldown(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            good = self.snapshot()
+            quota.write_snapshot(good, output)
+            original = output.read_bytes()
+            state = dict(good)
+            failed = {"services": {"claude": {"retry_at": quota.iso_from_epoch(900),
+                                             "error": "HTTPError"}}}
+            with mock.patch.object(quota, "collect_all", return_value=failed), \
+                 mock.patch.object(quota.os, "replace", side_effect=OSError("secret")):
+                with self.assertRaises(OSError):
+                    quota.refresh_snapshot(output, state)
+            self.assertEqual(output.read_bytes(), original)
+            self.assertEqual(quota.epoch(state["services"]["claude"]["retry_at"]), 900)
+            self.assertEqual(list(Path(directory).iterdir()), [output])
+
+    def test_http_damaged_state_and_diagnostics_are_sanitized(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "latest.json"
+            server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+            server.snapshot, server.token = output, "fake"
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/watch",
+                                             headers={"Authorization": "Bearer fake"})
+            try:
+                for state in ("{secret", "[1]", '{"services": []}',
+                              json.dumps(self.snapshot({"5h": {"used": 1}})),
+                              '{"services": {"claude": {"retry_at": "secret"}}}'):
+                    output.write_text(state)
+                    with mock.patch.object(quota.sys, "stderr", new_callable=io.StringIO) as log:
+                        with self.assertRaises(urllib.error.HTTPError) as error:
+                            urllib.request.urlopen(request, timeout=2)
+                        self.assertEqual(error.exception.code, 503)
+                        self.assertNotIn("secret", error.exception.read().decode())
+                        error.exception.close()
+                        self.assertNotIn("secret", log.getvalue())
+                output.write_text(json.dumps(self.snapshot({"5h": self.WINDOW, "7d": {"used": 1}})))
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    self.assertEqual(len(json.load(response)["q"]), 1)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
 
 
 if __name__ == "__main__":
