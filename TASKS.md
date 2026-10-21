@@ -51,11 +51,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 - [ ] [16] Fix the collector and build findings of the 2026-10-21 security review
       <!-- hai:{"id":"simple-fbb27a76-39b2-4c99-9ed9-428c1553858c","labels":["steward"],"createdAt":"2026-10-20T22:25:33.272Z","updatedAt":"2026-10-20T22:31:14.776Z"} -->
 
-- [ ] [15] Security scan of pebble-quota: provider tokens, outputs and history
-      <!-- hai:{"id":"simple-71337a70-182d-486f-9f51-1fd788aba3af","labels":["steward","security"],"createdAt":"2026-10-20T20:10:50.486Z","updatedAt":"2026-10-20T21:08:03.068Z"} -->
+- [x] [15] Security scan of pebble-quota: provider tokens, outputs and history
+      <!-- hai:{"id":"simple-71337a70-182d-486f-9f51-1fd788aba3af","labels":["steward","security"],"createdAt":"2026-10-20T20:10:50.486Z","updatedAt":"2026-10-21T05:18:31.763Z"} -->
 
-- [ ] [13] Make temperature units and entity age explicit
-      <!-- hai:{"id":"simple-0df495bc-7407-4aec-a21b-301ab4b35cde","labels":["steward"],"createdAt":"2026-10-19T12:35:46.982Z","updatedAt":"2026-10-19T16:02:05.181Z"} -->
+- [x] [13] Make temperature units and entity age explicit
+      <!-- hai:{"id":"simple-0df495bc-7407-4aec-a21b-301ab4b35cde","labels":["steward"],"createdAt":"2026-10-19T12:35:46.982Z","updatedAt":"2026-10-21T05:18:34.863Z"} -->
 
 - [x] [5] Check the 2026-09-19 architecture review's remediation plan against the
   code and draft what remains
