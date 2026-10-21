@@ -96,3 +96,13 @@ short after ten minutes. Negative swap growth means swap use fell.
 | 2 | started at once | 0.0 | 2645 | 2652 | 2449 | 0 | 3.63 | 1 |
 | 3 | started at once | 0.0 | 2542 | 2531 | 2443 | 0 | 3.93 | 0 |
 | 4 | started at once | 0.0 | 2771 | 2803 | 2427 | 0 | 11.28 | 0 |
+
+## Merge and handoff
+
+The canonical tracker start move was committed immediately on main as `34963ac`;
+the plan was committed there as `e14b2eb`. Implementation `44a038f` was rebased
+on main and merged with `git merge --ff-only` after the final 57-test pass.
+Completion move `375f985` places this issue in Completed / Accepted with `[ ]`;
+acceptance remains with the steward. The branch and worktree are retained.
+The steward restarts the collector after acceptance under D78; this run made no
+service change. No owner action is required and this thread can be closed.
