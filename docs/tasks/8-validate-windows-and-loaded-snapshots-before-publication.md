@@ -30,3 +30,13 @@ collecting: a nonempty array root now prevents provider attempts.
   current successful-refresh fixture containing only {"used": 1} with valid windows.
 - Document validation/unavailable-data semantics; HTTP gracefully handles damaged
   state and returns sanitized diagnostics rather than raw exception text.
+
+## Implementation plan
+
+1. Normalize provider windows and loaded snapshots through one validation boundary;
+   reject individual invalid rows and retain only safe scheduling metadata.
+2. Keep attempt/cooldown persistence separate from quota availability. Preserve
+   valid prior quota on an unusable refresh, including write-failure memory state.
+3. Return HTTP 503 for unavailable quota and fixed diagnostic messages for failures.
+4. Add fixture-only regression coverage, run the full unittest suite under the
+   memory guard, review the diff, rebase and merge, then mark complete unaccepted.
