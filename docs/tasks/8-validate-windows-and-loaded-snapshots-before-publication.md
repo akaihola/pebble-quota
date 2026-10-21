@@ -1,11 +1,11 @@
----
-depends-on: [7]
----
-
 # Validate windows and loaded snapshots before publication
 
 Steward proposal, 2026-10-19, from architecture audit [5].
 Pending steward promotion; not authorization to implement or deploy.
+
+Promoted by the steward, 2026-10-22 01:58 refill (D13). Goal: agentic-leverage (pebble-quota is tier 1 on the goals page). The dependency on [7] is dropped: these criteria need only the local unittest suite, not the CI gate, which stays with [7]. Checked on current `main` before promoting: `has_quota_data()` in `collector/pebble_quota.py` still tests `service.get("windows")` for truthiness. Estimated 2 h.
+
+Constraints for this run: tests use fakes and fixtures only; never call an authenticated provider, print a credential, or restart the collector service (the steward restarts it after acceptance, D78). Memory: before each command, wait up to 10 minutes for `MemAvailable` of at least 2 GiB; if it doesn't come, start anyway at 1.5 GiB or more. Stop a running command when `MemAvailable` falls below 1 GiB or swap grows by more than 512 MiB. Run `python3 -m unittest discover -s tests -v` before merging. Handoff: a short outcome and the test result; put detail in this task record.
 
 Review F2 / Step 4. has_quota_data still tests dictionary truthiness and
 compact_watch can fail on one bad window. 658613c also reads prior JSON before
