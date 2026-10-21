@@ -32,12 +32,12 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+## Scheduled
+
 - [10] Report Codex RPC failures and reap the subprocess reliably
     - Depends on: [8]
 
-  <!-- hai:{"id":"simple-1be37a59-fc45-417e-80e9-7f772086d4ef","labels":["steward"],"createdAt":"2026-10-19T12:35:36.626Z","updatedAt":"2026-10-21T23:13:52.810Z"} -->
-
-## Scheduled
+  <!-- hai:{"id":"simple-1be37a59-fc45-417e-80e9-7f772086d4ef","labels":["steward"],"createdAt":"2026-10-19T12:35:36.626Z","updatedAt":"2026-10-21T23:55:09.723Z"} -->
 
 ## In Progress
 
