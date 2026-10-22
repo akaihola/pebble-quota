@@ -17,6 +17,7 @@ import urllib.error
 import urllib.request
 from email.message import Message
 from pathlib import Path
+from typing import ClassVar
 from unittest import mock
 
 MODULE_PATH = Path(__file__).parents[1] / "collector/pebble_quota.py"
@@ -706,7 +707,9 @@ class SecurityTests(unittest.TestCase):
                 "Path(os.environ['HOME'], 'env.json').write_text(json.dumps(dict(os.environ)))\n"
                 "for line in sys.stdin:\n"
                 "    request = json.loads(line)\n"
-                "    if 'id' in request:\n"
+                "    if request.get('id') == 1:\n"
+                "        print(json.dumps({'id': 1, 'result': {'userAgent': 'fake'}}), flush=True)\n"
+                "    elif 'id' in request:\n"
                 "        print(json.dumps({'id': request['id'], 'result': {'primary': "
                 "{'usedPercent': 20, 'windowDurationMins': 300, 'resetsAt': 18000}}}), flush=True)\n")
             fake.chmod(0o700)
@@ -725,7 +728,7 @@ class SecurityTests(unittest.TestCase):
                 result = quota.collect_codex()
             self.assertEqual(result["windows"]["5h"]["used_fraction"], .2)
             child_env = json.loads((home / "env.json").read_text())
-            self.assertEqual(set(child_env), set(env) -
+            self.assertEqual(set(child_env), (set(env) | {"SHELL"}) -
                              {"PEBBLE_QUOTA_TOKEN", "HASS_TOKEN", "OPENAI_API_KEY", "OTHER_SECRET", "LC_API_KEY"})
 
     def test_build_and_clean_scrub_environment(self):
@@ -933,7 +936,8 @@ class ValidationTests(unittest.TestCase):
         for primary in (None, [], "bad", {}, dict(good, resetsAt="bad"),
                         dict(good, usedPercent="20"), dict(good, windowDurationMins=[])):
             with self.subTest(primary=primary):
-                process = mock.Mock(stdin=io.StringIO(), stdout=io.StringIO(json.dumps({
+                process = mock.Mock(stdin=io.StringIO(), stdout=io.StringIO(
+                    json.dumps({"id": 1, "result": {"userAgent": "fake"}}) + "\n" + json.dumps({
                     "id": 2, "result": {"rateLimits": {"primary": primary,
                                                          "secondary": good}}}) + "\n"))
                 with mock.patch.object(quota.subprocess, "Popen", return_value=process):
@@ -1058,6 +1062,167 @@ class ValidationTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
                 thread.join(timeout=2)
+
+
+class CodexRPCTests(unittest.TestCase):
+    INITIALIZE: ClassVar[dict] = {"id": 1, "result": {"userAgent": "fake-app-server"}}
+    WINDOW: ClassVar[dict] = {"usedPercent": 1, "resetsAt": 1000, "windowDurationMins": 300}
+
+    @contextlib.contextmanager
+    def server(self, replies, *, ignore_terminate=False):
+        """Run only a generated fixture, never a PATH-resolved provider CLI."""
+        with tempfile.TemporaryDirectory() as directory:
+            fake = Path(directory) / "app_server.py"
+            fake.write_text(
+                "import json, signal, sys\n"
+                + ("signal.signal(signal.SIGTERM, signal.SIG_IGN)\n" if ignore_terminate else "")
+                + "replies = " + repr(replies) + "\n"
+                "for line in sys.stdin:\n"
+                "    request = json.loads(line)\n"
+                "    if 'id' not in request: continue\n"
+                "    output = replies.get(request['id'], [])\n"
+                "    if output is None: sys.exit(0)\n"
+                "    for response in output:\n"
+                "        print(response, flush=True)\n")
+            processes = []
+            def launch(args, **kwargs):
+                self.assertEqual(args, ["codex", "app-server", "--stdio"])
+                process = _REAL_POPEN([sys.executable, str(fake)], **kwargs)
+                processes.append(process)
+                return process
+
+            with mock.patch.object(quota.subprocess, "Popen", side_effect=launch), \
+                 mock.patch.object(quota, "CODEX_RPC_TIMEOUT_SECONDS", .5), \
+                 mock.patch.object(quota, "CODEX_EXIT_TIMEOUT_SECONDS", .1):
+                try:
+                    yield processes
+                finally:
+                    for process in processes:
+                        # Cleanup even when an assertion fails, then report adapter leaks.
+                        leaked = process.poll() is None
+                        if leaked:
+                            process.kill()
+                            process.wait()
+                        self.assertFalse(leaked, "adapter left fixture running")
+                        self.assertIsNotNone(process.returncode)
+                        self.assertTrue(process.stdin.closed)
+                        self.assertTrue(process.stdout.closed)
+
+    def replies(self, result):
+        return {1: [json.dumps(self.INITIALIZE)],
+                2: [json.dumps({"id": 2, "result": result})]}
+
+    def assert_failure(self, replies, expected):
+        with self.server(replies), self.assertRaises(quota.CodexError) as caught:
+            quota.collect_codex()
+        self.assertEqual(quota.diagnostic(caught.exception), expected)
+
+    def test_success_notifications_and_duration_labels(self):
+        result = {"rateLimits": {"primary": self.WINDOW,
+                  "secondary": dict(self.WINDOW, windowDurationMins=10080)}}
+        replies = self.replies(result)
+        for responses in replies.values():
+            responses.insert(0, json.dumps({"method": "fake/notification",
+                                            "params": {"credential": "fixture-only"}}))
+        with self.server(replies):
+            data = quota.collect_codex()
+        self.assertEqual(list(data["windows"]), ["5h", "7d"])
+        self.assertEqual(data["windows"]["5h"]["used_fraction"], .01)
+        with self.server(self.replies({"primary": dict(self.WINDOW, windowDurationMins=60)})):
+            self.assertEqual(list(quota.collect_codex()["windows"]), ["60m"])
+
+    def test_both_rpc_errors_are_sanitized_and_other_rows_survive(self):
+        error = {"code": -32000, "message": "fixture-only", "data": "fixture-only"}
+        for request_id, stage in ((1, "initialize"), (2, "rate limits")):
+            replies = self.replies({"rateLimits": {}})
+            replies[request_id] = [json.dumps({"id": request_id, "error": error})]
+            with self.subTest(stage=stage), self.server(replies), \
+                 mock.patch.object(quota, "collect_claude", return_value={
+                     "windows": {"5h": {"used_fraction": .2, "resets_at": 1000,
+                                       "duration_seconds": 18000}}}), \
+                 mock.patch.object(quota, "collect_temperature", return_value=None):
+                data = quota.collect_all()
+                self.assertEqual(data["services"]["codex"]["error"],
+                                 f"Codex {stage}: RPC error (check CLI login and compatibility)")
+                self.assertEqual(quota.compact_watch(data)["q"][0]["s"], "C")
+                self.assertNotIn("fixture-only", json.dumps(data))
+                self.assertEqual(quota.normalize_snapshot(data)["services"]["codex"]["error"],
+                                 data["services"]["codex"]["error"])
+
+    def test_eof_and_timeout_at_each_stage(self):
+        for request_id, stage in ((1, "initialize"), (2, "rate limits")):
+            for response, reason in ((None, "unexpected EOF"), ([], "response timeout")):
+                with self.subTest(stage=stage, reason=reason):
+                    replies = self.replies({"rateLimits": {}})
+                    replies[request_id] = response
+                    self.assert_failure(replies, f"Codex {stage}: {reason}")
+
+    def test_notifications_without_a_reply_still_time_out(self):
+        for request_id, stage in ((1, "initialize"), (2, "rate limits")):
+            replies = self.replies({"rateLimits": {}})
+            replies[request_id] = [json.dumps({"method": "notice"})] * 20
+            with self.subTest(stage=stage):
+                self.assert_failure(replies, f"Codex {stage}: response timeout")
+
+    def test_invalid_json_responses_and_results(self):
+        for request_id, stage in ((1, "initialize"), (2, "rate limits")):
+            cases = [
+                ("fixture-only{", "invalid JSON"),
+                ("[]", "invalid response"),
+                ("{}", "invalid response"),
+                (json.dumps({"id": 99, "result": {}}), "invalid response"),
+                (json.dumps({"id": True, "result": {}}), "invalid response"),
+            ]
+            for result in (None, [], "fixture-only", {}, {"userAgent": []}):
+                cases.append((json.dumps({"id": request_id, "result": result}), "invalid result"))
+            if request_id == 2:
+                for result in ({"rateLimits": None}, {"rateLimits": []},
+                               {"rateLimits": {"primary": []}},
+                               {"rateLimits": {"primary": {"usedPercent": "fixture-only"}}}):
+                    cases.append((json.dumps({"id": 2, "result": result}), "invalid result"))
+            for response, reason in cases:
+                with self.subTest(stage=stage, response=response):
+                    replies = self.replies({"rateLimits": {}})
+                    replies[request_id] = [response]
+                    self.assert_failure(replies, f"Codex {stage}: {reason}")
+
+    def test_explicit_no_windows(self):
+        for result in ({"rateLimits": {}}, {"rateLimits": {"primary": None, "secondary": None}},
+                       {"primary": None, "secondary": None}):
+            with self.subTest(result=result), self.server(self.replies(result)):
+                self.assertEqual(quota.collect_codex(), {
+                    "service": "codex", "windows": {},
+                    "error": "Codex rate limits: no quota windows"})
+
+    def test_no_windows_diagnostic_survives_collection(self):
+        with self.server(self.replies({"rateLimits": {}})), \
+             mock.patch.object(quota, "collect_claude", return_value={"windows": {}}), \
+             mock.patch.object(quota, "collect_temperature", return_value=None):
+            data = quota.collect_all()
+        self.assertEqual(data["services"]["codex"]["error"], "Codex rate limits: no quota windows")
+
+    def test_forced_kill_is_followed_by_wait_and_pipe_cleanup(self):
+        import signal
+        for replies, fails in ((self.replies({"rateLimits": {}}), False),
+                               ({1: []}, True)):
+            with self.subTest(fails=fails), self.server(replies, ignore_terminate=True) as processes:
+                if fails:
+                    with self.assertRaises(quota.CodexError):
+                        quota.collect_codex()
+                else:
+                    quota.collect_codex()
+                self.assertEqual(processes[0].returncode, -signal.SIGKILL)
+
+    def test_write_failure_still_reaps_and_closes(self):
+        process = mock.Mock(stdin=io.StringIO(), stdout=io.StringIO())
+        process.stdin = mock.Mock(wraps=process.stdin)
+        process.stdin.write.side_effect = BrokenPipeError("fixture-only")
+        with mock.patch.object(quota.subprocess, "Popen", return_value=process), \
+             self.assertRaisesRegex(quota.CodexError, "Codex initialize: pipe failure"):
+            quota.collect_codex()
+        process.wait.assert_called_once()
+        process.stdin.close.assert_called_once()
+        self.assertTrue(process.stdout.closed)
 
 
 if __name__ == "__main__":

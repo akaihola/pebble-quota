@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hmac
 import json
 import math
@@ -27,6 +28,20 @@ DURATIONS = {300: "5h", 10_080: "7d"}
 CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 CLAUDE_BACKOFF_SECONDS = 600
 CLAUDE_MAX_BACKOFF_SECONDS = 3600
+CODEX_RPC_TIMEOUT_SECONDS = 15
+CODEX_EXIT_TIMEOUT_SECONDS = 2
+CODEX_DIAGNOSTICS = {
+    f"Codex {stage}: {reason}"
+    for stage in ("initialize", "rate limits")
+    for reason in ("RPC error (check CLI login and compatibility)", "response timeout",
+                   "unexpected EOF", "invalid JSON", "invalid response", "invalid result",
+                   "pipe failure")
+} | {"Codex rate limits: no quota windows"}
+
+
+class CodexError(RuntimeError):
+    """Only fixed, allowlisted diagnostics may leave the subprocess adapter."""
+
 
 # Home Assistant entity for the local Koivusyrjä outside temperature (met.no forecast).
 HASS_TEMPERATURE_ENTITY = "weather.forecast_koti"
@@ -50,7 +65,7 @@ WATCH_INT_MAX = 2**31 - 1
 # The watch multiplies duration by 100 in signed 32-bit arithmetic.
 MAX_DURATION_SECONDS = WATCH_INT_MAX // 100
 DIAGNOSTICS = {"HTTPError", "URLError", "TimeoutError", "RuntimeError", "OSError",
-               "ValueError", "JSONDecodeError", "Invalid quota windows", "Quota unavailable"}
+               "ValueError", "JSONDecodeError", "Invalid quota windows", "Quota unavailable"} | CODEX_DIAGNOSTICS
 
 
 def epoch(value: Any) -> int | None:
@@ -80,6 +95,8 @@ def percent_fraction(value: Any) -> float | None:
 
 
 def diagnostic(error: Exception) -> str:
+    if isinstance(error, CodexError) and str(error) in CODEX_DIAGNOSTICS:
+        return str(error)
     name = type(error).__name__
     return name if name in DIAGNOSTICS else "Quota unavailable"
 
@@ -269,44 +286,82 @@ def collect_codex() -> dict[str, Any]:
         stderr=subprocess.DEVNULL,
         text=True,
         bufsize=1,
-        env={key: value for key, value in os.environ.items()
+        env={"SHELL": "/bin/bash", **{key: value for key, value in os.environ.items()
              if key in {"HOME", "PATH", "TERM", "LANG", "LANGUAGE", "CODEX_HOME",
                         "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
                         "http_proxy", "https_proxy", "all_proxy", "no_proxy",
                         "LC_ALL", "LC_CTYPE", "LC_NUMERIC", "LC_TIME", "LC_COLLATE",
                         "LC_MONETARY", "LC_MESSAGES", "LC_PAPER", "LC_NAME", "LC_ADDRESS",
-                        "LC_TELEPHONE", "LC_MEASUREMENT", "LC_IDENTIFICATION"}},
+                        "LC_TELEPHONE", "LC_MEASUREMENT", "LC_IDENTIFICATION"}}},
     )
     assert proc.stdin is not None and proc.stdout is not None
     stdin, stdout = proc.stdin, proc.stdout
-    lines: queue.Queue[str] = queue.Queue()
+    lines: queue.Queue[str | None] = queue.Queue()
 
     def read_stdout() -> None:
-        for line in stdout:
-            lines.put(line)
+        try:
+            for line in stdout:
+                lines.put(line)
+        except (OSError, UnicodeError):
+            lines.put("")  # A read/decode failure, distinct from normal EOF.
+        finally:
+            lines.put(None)
 
-    threading.Thread(target=read_stdout, daemon=True).start()
+    reader = threading.Thread(target=read_stdout, daemon=True)
 
     def send(message: dict[str, Any]) -> None:
         stdin.write(json.dumps(message) + "\n")
         stdin.flush()
 
+    stage = "initialize"
     try:
+        reader.start()
         send({"id": 1, "method": "initialize", "params": {
             "clientInfo": {"name": "pebble-quota", "title": "Pebble Quota", "version": "0.1"}
         }})
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            message = json.loads(lines.get(timeout=max(0.1, deadline - time.monotonic())))
-            if message.get("id") == 1:
+        deadline = time.monotonic() + CODEX_RPC_TIMEOUT_SECONDS
+        request_id = 1
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise CodexError(f"Codex {stage}: response timeout")
+            try:
+                line = lines.get(timeout=remaining)
+            except queue.Empty:
+                raise CodexError(f"Codex {stage}: response timeout") from None
+            if line is None:
+                raise CodexError(f"Codex {stage}: unexpected EOF")
+            if line == "":
+                raise CodexError(f"Codex {stage}: pipe failure")
+            try:
+                message = json.loads(line)
+            except ValueError:
+                raise CodexError(f"Codex {stage}: invalid JSON") from None
+            if not isinstance(message, dict):
+                raise CodexError(f"Codex {stage}: invalid response")
+            if "id" not in message and isinstance(message.get("method"), str):
+                continue  # Notifications do not advance the handshake or deadline.
+            if type(message.get("id")) is not int or message["id"] != request_id:
+                raise CodexError(f"Codex {stage}: invalid response")
+            if "error" in message:
+                raise CodexError(f"Codex {stage}: RPC error (check CLI login and compatibility)")
+            result = message.get("result")
+            if not isinstance(result, dict):
+                raise CodexError(f"Codex {stage}: invalid result")
+            if request_id == 1:
+                if not isinstance(result.get("userAgent"), str) or not result["userAgent"]:
+                    raise CodexError("Codex initialize: invalid result")
+                stage = "rate limits"
                 send({"method": "initialized", "params": {}})
                 send({"id": 2, "method": "account/rateLimits/read", "params": {}})
-            elif message.get("id") == 2:
-                result = message.get("result", {})
+                request_id = 2
+            else:
+                if not any(key in result for key in ("rateLimits", "primary", "secondary")):
+                    raise CodexError("Codex rate limits: invalid result")
                 limits = result.get("rateLimits", result)
                 windows = {}
                 if not isinstance(limits, dict):
-                    return {"service": "codex", "windows": windows}
+                    raise CodexError("Codex rate limits: invalid result")
                 for source in ("primary", "secondary"):
                     if not isinstance(item := limits.get(source), dict):
                         continue
@@ -321,14 +376,31 @@ def collect_codex() -> dict[str, Any]:
                     })
                     if window:
                         windows[name] = window
-                return {"service": "codex", "windows": windows}
-        raise TimeoutError("Codex app-server did not return rate limits")
+                if not windows and any(limits.get(key) is not None for key in ("primary", "secondary")):
+                    raise CodexError("Codex rate limits: invalid result")
+                data = {"service": "codex", "windows": windows}
+                if not windows:
+                    data["error"] = "Codex rate limits: no quota windows"
+                return data
+    except OSError:
+        raise CodexError(f"Codex {stage}: pipe failure") from None
     finally:
-        proc.terminate()
         try:
-            proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                pass
+            try:
+                proc.wait(timeout=CODEX_EXIT_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+        finally:
+            if reader.ident is not None:
+                reader.join()
+            for pipe in (stdin, stdout):
+                with contextlib.suppress(OSError):
+                    pipe.close()
 
 
 def collect_temperature() -> int | None:
@@ -418,7 +490,7 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
             output["services"][name] = normalize_snapshot(
                 {"services": {name: collector()}})["services"].get(name, {})
             if not output["services"][name].get("windows"):
-                output["services"][name]["error"] = "Invalid quota windows"
+                output["services"][name].setdefault("error", "Invalid quota windows")
             if name == "claude" and output["services"][name].get("windows"):
                 output["services"][name]["last_success_at"] = output["collected_at"]
         except Exception as exc:

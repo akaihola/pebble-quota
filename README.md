@@ -37,6 +37,23 @@ Response fields are intentionally compact for PebbleKit JS:
 
 Claude collection uses an undocumented OAuth endpoint used by Claude Code itself. Codex collection uses the supported local app-server JSON-RPC method `account/rateLimits/read`.
 
+Codex RPC failures use fixed diagnostics naming the failing stage
+(`initialize` or `rate limits`) and cause: RPC error, response timeout,
+unexpected EOF, invalid JSON, invalid response/result, or pipe failure. An RPC
+error calls for checking CLI login and protocol compatibility through an
+authorized operator; raw RPC error messages, data and stdout are never published.
+Notifications do not extend the 15-second response deadline. Legitimate empty
+window sets report `Codex rate limits: no quota windows`; malformed results fail collection, and valid sibling windows
+survive malformed windows. The child is terminated, killed if it exceeds the
+two-second exit grace, reaped, and its pipes closed on success and failure.
+
+Codex CLI compatibility is **unverified as of 2026-10-22**: this change was
+validated with fake app-servers only, without invoking an authenticated CLI.
+The fixtures model initialize's `userAgent` result and both wrapped
+`rateLimits` and legacy direct window results. No installed CLI version was
+used for compatibility verification. The steward handles the service restart
+after acceptance.
+
 Claude HTTP 429 responses pause subsequent Claude requests until a persisted
 `retry_at` deadline. Positive `Retry-After` seconds and HTTP dates take precedence;
 missing, zero, invalid or expired values use 10, 20, 40, then 60 minutes between
