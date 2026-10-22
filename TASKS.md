@@ -36,11 +36,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [20] Review pebble-quota's architecture for deep modules and over-engineering,
-  and draft the fixes
-      <!-- hai:{"id":"simple-5385fc70-974c-4eb4-bcd4-deaa7ad0b266","labels":["steward","review"],"createdAt":"2026-10-22T03:30:52.951Z","updatedAt":"2026-10-22T03:46:19.753Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [20] Review pebble-quota's architecture for deep modules and over-engineering,
+  and draft the fixes
+      <!-- hai:{"id":"simple-5385fc70-974c-4eb4-bcd4-deaa7ad0b266","labels":["steward","review"],"createdAt":"2026-10-22T03:30:52.951Z","updatedAt":"2026-10-22T03:58:23.874Z"} -->
 
 - [ ] [19] Fix the seven Ruff and four ty findings and document both checks
       <!-- hai:{"id":"simple-3da495ef-c4ef-4533-baf5-c2cb4a3ffdb7","labels":["steward"],"createdAt":"2026-10-22T02:21:58.886Z","updatedAt":"2026-10-22T03:06:44.967Z"} -->
