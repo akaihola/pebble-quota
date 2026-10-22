@@ -32,6 +32,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [18] Check pebble-quota's documents, docstrings and comments against current
+  main
+  <!-- hai:{"id":"simple-c22eff43-a865-4beb-9131-952fb456dd6f","labels":["steward","review"],"createdAt":"2026-10-22T01:31:09.461Z","updatedAt":"2026-10-22T01:31:09.461Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -84,7 +88,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -115,6 +119,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [16]: docs/tasks/16-fix-the-collector-and-build-findings-of-the-2026-10-21-security-review.md
 
 [17]: docs/tasks/17-find-what-claude-s-usage-endpoint-rate-limits-on-from-public-sources-a.md
+
+[18]: docs/tasks/18-check-pebble-quota-s-documents-docstrings-and-comments-against-current.md
 
 ## Rules
 
