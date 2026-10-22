@@ -38,36 +38,36 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Completed / Accepted
 
-- [ ] [24] Remove unused collector helper generality
-      <!-- hai:{"id":"simple-446bba0e-2d7a-4660-b462-7362295c7112","labels":["steward"],"createdAt":"2026-10-22T05:11:43.566Z","updatedAt":"2026-10-22T05:59:31.586Z"} -->
+- [x] [24] Remove unused collector helper generality
+      <!-- hai:{"id":"simple-446bba0e-2d7a-4660-b462-7362295c7112","labels":["steward"],"createdAt":"2026-10-22T05:11:43.566Z","updatedAt":"2026-10-22T07:51:17.588Z"} -->
 
-- [ ] [23] Isolate the unavailable-snapshot merge
-      <!-- hai:{"id":"simple-fa638f7f-2f94-4695-8677-8a989fa2da47","labels":["steward"],"createdAt":"2026-10-22T04:21:13.386Z","updatedAt":"2026-10-22T05:02:44.664Z"} -->
+- [x] [23] Isolate the unavailable-snapshot merge
+      <!-- hai:{"id":"simple-fa638f7f-2f94-4695-8677-8a989fa2da47","labels":["steward"],"createdAt":"2026-10-22T04:21:13.386Z","updatedAt":"2026-10-22T07:51:18.354Z"} -->
 
-- [ ] [22] Separate Codex result decoding from RPC
-      <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T04:49:48.175Z"} -->
+- [x] [22] Separate Codex result decoding from RPC
+      <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T07:51:19.360Z"} -->
 
-- [ ] [21] Use one compact payload decision for HTTP
-      <!-- hai:{"id":"simple-6988dc7b-6270-4019-b391-03a6b66820f4","labels":["steward"],"createdAt":"2026-10-22T04:21:10.465Z","updatedAt":"2026-10-22T04:26:06.879Z"} -->
+- [x] [21] Use one compact payload decision for HTTP
+      <!-- hai:{"id":"simple-6988dc7b-6270-4019-b391-03a6b66820f4","labels":["steward"],"createdAt":"2026-10-22T04:21:10.465Z","updatedAt":"2026-10-22T07:51:20.356Z"} -->
 
-- [ ] [20] Review pebble-quota's architecture for deep modules and over-engineering,
+- [x] [20] Review pebble-quota's architecture for deep modules and over-engineering,
   and draft the fixes
-      <!-- hai:{"id":"simple-5385fc70-974c-4eb4-bcd4-deaa7ad0b266","labels":["steward","review"],"createdAt":"2026-10-22T03:30:52.951Z","updatedAt":"2026-10-22T03:58:23.874Z"} -->
+      <!-- hai:{"id":"simple-5385fc70-974c-4eb4-bcd4-deaa7ad0b266","labels":["steward","review"],"createdAt":"2026-10-22T03:30:52.951Z","updatedAt":"2026-10-22T07:51:21.956Z"} -->
 
-- [ ] [19] Fix the seven Ruff and four ty findings and document both checks
-      <!-- hai:{"id":"simple-3da495ef-c4ef-4533-baf5-c2cb4a3ffdb7","labels":["steward"],"createdAt":"2026-10-22T02:21:58.886Z","updatedAt":"2026-10-22T03:06:44.967Z"} -->
+- [x] [19] Fix the seven Ruff and four ty findings and document both checks
+      <!-- hai:{"id":"simple-3da495ef-c4ef-4533-baf5-c2cb4a3ffdb7","labels":["steward"],"createdAt":"2026-10-22T02:21:58.886Z","updatedAt":"2026-10-22T07:51:22.855Z"} -->
 
-- [ ] [18] Check pebble-quota's documents, docstrings and comments against current
+- [x] [18] Check pebble-quota's documents, docstrings and comments against current
   main
-      <!-- hai:{"id":"simple-c22eff43-a865-4beb-9131-952fb456dd6f","labels":["steward","review"],"createdAt":"2026-10-22T01:31:09.461Z","updatedAt":"2026-10-22T02:17:36.169Z"} -->
+      <!-- hai:{"id":"simple-c22eff43-a865-4beb-9131-952fb456dd6f","labels":["steward","review"],"createdAt":"2026-10-22T01:31:09.461Z","updatedAt":"2026-10-22T07:51:23.656Z"} -->
 
-- [ ] [10] Report Codex RPC failures and reap the subprocess reliably
+- [x] [10] Report Codex RPC failures and reap the subprocess reliably
     - Depends on: [8]
 
-      <!-- hai:{"id":"simple-1be37a59-fc45-417e-80e9-7f772086d4ef","labels":["steward"],"createdAt":"2026-10-19T12:35:36.626Z","updatedAt":"2026-10-22T00:00:22.555Z"} -->
+      <!-- hai:{"id":"simple-1be37a59-fc45-417e-80e9-7f772086d4ef","labels":["steward"],"createdAt":"2026-10-19T12:35:36.626Z","updatedAt":"2026-10-22T07:51:24.388Z"} -->
 
-- [ ] [8] Validate windows and loaded snapshots before publication
-      <!-- hai:{"id":"simple-ae2c788e-4c9e-4efd-841c-ee8f41766c5f","labels":["steward"],"createdAt":"2026-10-19T12:35:36.007Z","updatedAt":"2026-10-21T23:25:33.882Z"} -->
+- [x] [8] Validate windows and loaded snapshots before publication
+      <!-- hai:{"id":"simple-ae2c788e-4c9e-4efd-841c-ee8f41766c5f","labels":["steward"],"createdAt":"2026-10-19T12:35:36.007Z","updatedAt":"2026-10-22T07:51:25.081Z"} -->
 
 - [x] [17] Find what Claude's usage endpoint rate-limits on, from public sources and
   our own records
