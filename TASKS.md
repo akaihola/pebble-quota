@@ -36,12 +36,12 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [10] Report Codex RPC failures and reap the subprocess reliably
+## Completed / Accepted
+
+- [ ] [10] Report Codex RPC failures and reap the subprocess reliably
     - Depends on: [8]
 
-      <!-- hai:{"id":"simple-1be37a59-fc45-417e-80e9-7f772086d4ef","labels":["steward"],"createdAt":"2026-10-19T12:35:36.626Z","updatedAt":"2026-10-21T23:55:27.580Z"} -->
-
-## Completed / Accepted
+      <!-- hai:{"id":"simple-1be37a59-fc45-417e-80e9-7f772086d4ef","labels":["steward"],"createdAt":"2026-10-19T12:35:36.626Z","updatedAt":"2026-10-22T00:00:22.555Z"} -->
 
 - [ ] [8] Validate windows and loaded snapshots before publication
       <!-- hai:{"id":"simple-ae2c788e-4c9e-4efd-841c-ee8f41766c5f","labels":["steward"],"createdAt":"2026-10-19T12:35:36.007Z","updatedAt":"2026-10-21T23:25:33.882Z"} -->
