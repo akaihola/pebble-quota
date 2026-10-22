@@ -101,3 +101,11 @@ individual Ruff/ty checks still exited 1 as described above.
 | Baseline/current Ruff and ty comparison 3 | started at once; 0.0 s | 3083 / 3073 | 2386 / 0 | 1.11 s | 0 |
 
 [operations guidance]: ../../README.md
+
+## Merge and handoff
+
+Implementation `364f916` was merged into main by fast-forward after the final
+66-test pass and diff review; rebasing introduced no further changes.
+Completion was committed as `d683bc0`, leaving the issue unchecked in
+Completed / Accepted. The steward may review and perform the post-acceptance
+service restart. The owner has no required action; the work thread can close.
