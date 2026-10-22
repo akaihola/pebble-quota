@@ -72,6 +72,8 @@ executable content are unchanged. No formatting-only exception was needed.
   guide and review headings meet the 60-character limit. `git diff --check`
   passed. Temporary synthetic assertions with all providers mocked confirmed
   whole-snapshot temperature retention and the published example payload.
+  The first reference-label helper misread explicit image references; after
+  correcting the helper, all labels and 55 local links/anchors passed.
 - **Existing checker failures:** the edit tool automatically ran Ruff and `ty`.
   Explicit `ruff check --output-format json` and `ty check --output-format concise`
   comparisons on the unchanged main collector and edited collector both exited
@@ -109,8 +111,14 @@ stop the command and children below 1,024 MiB or above 512 MiB swap growth.
 
 No owner decision is required for this documentation change. The steward owns
 the recorded follow-ups and acceptance; completion leaves the checkbox empty.
-The branch and worktree will be retained after the local main merge. No push,
+The branch and worktree remain after the local main merge. No push,
 deployment, release or message to another person is part of this handoff.
+
+Delivery commits: `ddb5723` committed the start move, `9a572d2` recorded the plan,
+and `418b500` contains the reviewed text changes and evidence. Main fast-forwarded
+to `418b500` after validation; the review is now on main. The final tracker move
+is committed separately as `docs(tasks): complete HAI-18`, with acceptance left
+unchecked.
 
 [collector reference]: ../collector.md
 [documentation review]: ../reviews/2026-10-22-docs-review.md
