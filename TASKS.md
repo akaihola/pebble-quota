@@ -32,6 +32,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [20] Review pebble-quota's architecture for deep modules and over-engineering,
+  and draft the fixes
+  <!-- hai:{"id":"simple-5385fc70-974c-4eb4-bcd4-deaa7ad0b266","labels":["steward","review"],"createdAt":"2026-10-22T03:30:52.951Z","updatedAt":"2026-10-22T03:30:52.951Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -91,7 +95,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -126,6 +130,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [18]: docs/tasks/18-check-pebble-quota-s-documents-docstrings-and-comments-against-current.md
 
 [19]: docs/tasks/19-fix-the-seven-ruff-and-four-ty-findings-and-document-both-checks.md
+
+[20]: docs/tasks/20-review-pebble-quota-s-architecture-for-deep-modules-and-over-engineeri.md
 
 ## Rules
 
