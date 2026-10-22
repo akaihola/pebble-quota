@@ -22,3 +22,22 @@ pebble-quota has never had a whole-repository architecture review. Its [2026-10-
 Tracker: [the pebble-quota tracker](../../TASKS.md).
 
 [19]: 19-fix-the-seven-ruff-and-four-ty-findings-and-document-both-checks.md
+
+## Implementation plan
+
+1. Record the active move on canonical `main`, commit this plan, and rebase
+   the review worktree. Pin the reviewed `main` commit for line evidence.
+2. Read the guides and previous reviews, trace collector fetch, persistence,
+   HTTP, phone and watch boundaries, and inspect the offline tests. Compare
+   proposed work with all existing open and unverified tasks.
+3. Write the [architecture report] with ranked findings, concrete behavior
+   constraints, deletion opportunities and roughly one-hour draft issues.
+   Use Honey and deep-module vocabulary; do not file or implement the drafts.
+4. Check citations and overlaps, run appropriate offline validation under the
+   required memory guard, and record evidence and limitations here. Merge only
+   the report and this task record into `main`, then complete the tracker entry
+   with acceptance unchecked. Keep the branch and worktree.
+
+No provider calls, security probing, deployment, or unrelated edits are needed.
+
+[architecture report]: ../reviews/2026-10-22-architecture-review.md
