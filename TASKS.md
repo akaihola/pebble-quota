@@ -32,13 +32,13 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [22] Separate Codex result decoding from RPC
-  <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T04:21:11.751Z"} -->
-
 - [23] Isolate the unavailable-snapshot merge
   <!-- hai:{"id":"simple-fa638f7f-2f94-4695-8677-8a989fa2da47","labels":["steward"],"createdAt":"2026-10-22T04:21:13.386Z","updatedAt":"2026-10-22T04:21:13.386Z"} -->
 
 ## Scheduled
+
+- [22] Separate Codex result decoding from RPC
+  <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T04:46:57.342Z"} -->
 
 ## In Progress
 
