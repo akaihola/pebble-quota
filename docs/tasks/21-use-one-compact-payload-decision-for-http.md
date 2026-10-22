@@ -21,3 +21,21 @@ Compute `compact_watch` once in the watch route, validate its `q` and `at`, then
 - Handoff: a short outcome; details go in this task record.
 
 Tracker: [the pebble-quota tracker](../../TASKS.md).
+
+## Plan
+
+1. Pin authenticated loopback publication behavior before editing production:
+   valid/mixed rows, zero and invalid timestamps, missing/corrupt/wrong-root
+   and rowless snapshots, fixed 503 body and sanitized diagnostic categories.
+   Assert the complete serialized rows, ordering and truncation.
+2. Compute one compact payload in the HTTP route, validate its rows and
+   timestamp, and serialize it. Use normalized window fields directly inside
+   the compactor; preserve public raw-input normalization and helper behavior.
+3. Run focused HTTP/validation checks, the offline Python suite, Ruff, ty and
+   JavaScript syntax checks sequentially under the memory guard. Review the
+   diff, record results here, merge onto main and complete the tracker entry
+   with acceptance unchecked.
+
+The review's F1/D1 references were rechecked on current main: the duplicate
+publication path remains at collector lines 689–693 and redundant compactor
+checks at lines 534–538. No policy change is needed.
