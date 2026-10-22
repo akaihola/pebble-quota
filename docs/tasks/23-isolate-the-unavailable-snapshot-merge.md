@@ -20,3 +20,26 @@ Extract only the whole-snapshot fallback merge into a pure function with no disk
 - Handoff: a short outcome; details go in this task record.
 
 Tracker: [the pebble-quota tracker](../../TASKS.md).
+
+## Plan
+
+1. Pin current behaviour first: exact persisted snapshots and compact payloads
+   for both providers failing over prior Claude rows versus prior Codex rows,
+   with a retained temperature, and the persisted state of a first 429 without
+   rows. Add direct data cases for the merge function, which must fail until it
+   exists.
+2. Extract the loop in `refresh_snapshot`'s unavailable branch into one pure
+   function in the collector module that copies the previous snapshot, merges
+   attempted service fields and computes stale ages from the attempted
+   collection time. `refresh_snapshot` keeps checkpoints, the `retained` check,
+   the in-memory update before the write, the write and the exception.
+3. Compare old and new code on the integration sequences (both-failed cases,
+   first 429, restart suppression, write failures) for identical written
+   snapshots and compact payloads; run focused tests, then the full offline
+   unittest, Ruff and ty checks under the memory guard; update the collector
+   guide; review, commit and merge into main.
+
+The freshness proposal [9] is still an unverified proposal with no
+implementation, so it supplies no seam to merge into. The review's F3 location
+was rechecked on main at `54c414a`: the fallback is now at lines 594–610 of
+the collector.
