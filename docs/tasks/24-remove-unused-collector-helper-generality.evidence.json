@@ -1,0 +1,99 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [24]",
+      "hai_id": "simple-446bba0e-2d7a-4660-b462-7362295c7112",
+      "title": "Remove unused collector helper generality",
+      "repository": "/tmp/claude-1001/pq24-evidence",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "63ee40e7e89402fefe6b478a7afe66595102dddc",
+      "delivery_commits": [
+        "667936530618dde4be828b8b275bbe3b4e7167c2"
+      ],
+      "checks": [
+        {
+          "id": "caller-search",
+          "command": "! git grep -n -E 'make_handler|iso_from_epoch\\((None|[^0-9a-z])' -- collector tests",
+          "dependencies": {}
+        },
+        {
+          "id": "numeric-format",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_pebble_quota.IsoFromEpochTests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "unittest",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "ruff",
+          "command": "ruff check .",
+          "dependencies": {}
+        },
+        {
+          "id": "ty",
+          "command": "ty check",
+          "dependencies": {}
+        }
+      ],
+      "evidence": {
+        "caller-search": {
+          "repository": "/tmp/claude-1001/pq24-evidence",
+          "tested_commit": "667936530618dde4be828b8b275bbe3b4e7167c2",
+          "dependencies": {},
+          "issue": "pebble-quota [24]",
+          "check": "caller-search",
+          "command": "! git grep -n -E 'make_handler|iso_from_epoch\\((None|[^0-9a-z])' -- collector tests",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-22T05:58:07.382192+00:00"
+        },
+        "numeric-format": {
+          "repository": "/tmp/claude-1001/pq24-evidence",
+          "tested_commit": "667936530618dde4be828b8b275bbe3b4e7167c2",
+          "dependencies": {},
+          "issue": "pebble-quota [24]",
+          "check": "numeric-format",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_pebble_quota.IsoFromEpochTests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-22T05:58:08.688692+00:00"
+        },
+        "unittest": {
+          "repository": "/tmp/claude-1001/pq24-evidence",
+          "tested_commit": "667936530618dde4be828b8b275bbe3b4e7167c2",
+          "dependencies": {},
+          "issue": "pebble-quota [24]",
+          "check": "unittest",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-22T05:58:20.480395+00:00"
+        },
+        "ruff": {
+          "repository": "/tmp/claude-1001/pq24-evidence",
+          "tested_commit": "667936530618dde4be828b8b275bbe3b4e7167c2",
+          "dependencies": {},
+          "issue": "pebble-quota [24]",
+          "check": "ruff",
+          "command": "ruff check .",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-22T05:58:21.079334+00:00"
+        },
+        "ty": {
+          "repository": "/tmp/claude-1001/pq24-evidence",
+          "tested_commit": "667936530618dde4be828b8b275bbe3b4e7167c2",
+          "dependencies": {},
+          "issue": "pebble-quota [24]",
+          "check": "ty",
+          "command": "ty check",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-22T05:58:22.855905+00:00"
+        }
+      }
+    }
+  ]
+}
