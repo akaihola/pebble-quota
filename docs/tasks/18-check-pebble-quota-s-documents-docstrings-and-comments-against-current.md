@@ -12,7 +12,7 @@ Steward issue, 2026-10-22 04:23 refill. Goal: agentic-leverage (pebble-quota is 
 
 ## Constraints and acceptance
 
-- Text only: documents, docstrings and comments. No change to code behaviour or tests. Leave task files, earlier reviews and the dated architecture review as they are.
+- Text only: documents, docstrings and comments. No change to code behaviour or tests. A formatting-only change that a required check (formatter, import order) demands is allowed; say so in the task record. Leave task files, earlier reviews and the dated architecture review as they are.
 - No device, watch, phone or release run; this is a source and text check.
 - Before merging, run the tests and checks the Rules and `AGENTS.md` (or the README) ask for, and show they pass unchanged.
 - Memory: follow your launch prompt's memory rule, and run one heavy command (test suite, browser, build) at a time.
