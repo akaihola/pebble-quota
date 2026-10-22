@@ -32,6 +32,15 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [21] Use one compact payload decision for HTTP
+  <!-- hai:{"id":"simple-6988dc7b-6270-4019-b391-03a6b66820f4","labels":["steward"],"createdAt":"2026-10-22T04:21:10.465Z","updatedAt":"2026-10-22T04:21:10.465Z"} -->
+
+- [22] Separate Codex result decoding from RPC
+  <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T04:21:11.751Z"} -->
+
+- [23] Isolate the unavailable-snapshot merge
+  <!-- hai:{"id":"simple-fa638f7f-2f94-4695-8677-8a989fa2da47","labels":["steward"],"createdAt":"2026-10-22T04:21:13.386Z","updatedAt":"2026-10-22T04:21:13.386Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -95,7 +104,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -132,6 +141,12 @@ Rules for TASKS.md usage are at the bottom of the file.
 [19]: docs/tasks/19-fix-the-seven-ruff-and-four-ty-findings-and-document-both-checks.md
 
 [20]: docs/tasks/20-review-pebble-quota-s-architecture-for-deep-modules-and-over-engineeri.md
+
+[21]: docs/tasks/21-use-one-compact-payload-decision-for-http.md
+
+[22]: docs/tasks/22-separate-codex-result-decoding-from-rpc.md
+
+[23]: docs/tasks/23-isolate-the-unavailable-snapshot-merge.md
 
 ## Rules
 
