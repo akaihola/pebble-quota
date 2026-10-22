@@ -36,10 +36,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [19] Fix the seven Ruff and four ty findings and document both checks
-      <!-- hai:{"id":"simple-3da495ef-c4ef-4533-baf5-c2cb4a3ffdb7","labels":["steward"],"createdAt":"2026-10-22T02:21:58.886Z","updatedAt":"2026-10-22T03:01:15.967Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [19] Fix the seven Ruff and four ty findings and document both checks
+      <!-- hai:{"id":"simple-3da495ef-c4ef-4533-baf5-c2cb4a3ffdb7","labels":["steward"],"createdAt":"2026-10-22T02:21:58.886Z","updatedAt":"2026-10-22T03:06:44.967Z"} -->
 
 - [ ] [18] Check pebble-quota's documents, docstrings and comments against current
   main
