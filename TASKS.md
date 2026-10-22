@@ -36,10 +36,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [23] Isolate the unavailable-snapshot merge
-      <!-- hai:{"id":"simple-fa638f7f-2f94-4695-8677-8a989fa2da47","labels":["steward"],"createdAt":"2026-10-22T04:21:13.386Z","updatedAt":"2026-10-22T04:53:40.154Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [23] Isolate the unavailable-snapshot merge
+      <!-- hai:{"id":"simple-fa638f7f-2f94-4695-8677-8a989fa2da47","labels":["steward"],"createdAt":"2026-10-22T04:21:13.386Z","updatedAt":"2026-10-22T05:02:44.664Z"} -->
 
 - [ ] [22] Separate Codex result decoding from RPC
       <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T04:49:48.175Z"} -->
