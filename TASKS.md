@@ -42,10 +42,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [21] Use one compact payload decision for HTTP
-      <!-- hai:{"id":"simple-6988dc7b-6270-4019-b391-03a6b66820f4","labels":["steward"],"createdAt":"2026-10-22T04:21:10.465Z","updatedAt":"2026-10-22T04:22:05.265Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [21] Use one compact payload decision for HTTP
+      <!-- hai:{"id":"simple-6988dc7b-6270-4019-b391-03a6b66820f4","labels":["steward"],"createdAt":"2026-10-22T04:21:10.465Z","updatedAt":"2026-10-22T04:26:06.879Z"} -->
 
 - [ ] [20] Review pebble-quota's architecture for deep modules and over-engineering,
   and draft the fixes
