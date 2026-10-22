@@ -91,6 +91,13 @@ Verification on the branch after rebasing on `63ee40e`:
   `test_entity_age_boundaries_and_timezone_offsets` (ages 7200.001 and -0.001).
   The suite uses temporary loopback servers and blocks real provider access.
 
+After the merge, all five acceptance checks were recorded at `6679365` in
+[the evidence receipt], and all passed: the caller search
+(`git grep` for `make_handler`, `iso_from_epoch(None` and non-numeric
+`iso_from_epoch` arguments in `collector` and `tests` finds nothing), the
+numeric formatting test, the full unittest suite, Ruff and ty. No lockfile or
+editable checkout applies, so the checks declare no dependencies.
+
 No live quota request, phone or watch was used. No acceptance gaps remain.
 Completion is pending acceptance; the acceptance checkbox remains unchecked.
 
@@ -105,9 +112,15 @@ pinning test ran unguarded because each finishes in about a second.
 - `python3 -m unittest discover -s tests -v`: **started at once**; wait 0
   seconds; admission 2534, final 2333; starting swap 2082, swap growth −1;
   elapsed 19 seconds; exit 0.
+- Evidence recording after the merge: the five `check-evidence.py record`
+  calls (`caller-search`, `numeric-format`, `unittest`, `ruff`, `ty`) ran in
+  sequence as one guarded command from a clean detached checkout at
+  `6679365`: **started at once**; wait 0 seconds; admission 2161, final
+  2689; starting swap 2150, swap growth −1; elapsed 17 seconds; exit 0.
 
 [The collector]: ../../collector/pebble_quota.py
 [The tests]: ../../tests/test_pebble_quota.py
 [historical spike]: ../../spikes/001-quota-collectors/
 [the September review]: ../2026-09-19-architecture-review-and-remediation-plan.md
 [checker-fixes record]: 19-fix-the-seven-ruff-and-four-ty-findings-and-document-both-checks.md
+[the evidence receipt]: 24-remove-unused-collector-helper-generality.evidence.json
