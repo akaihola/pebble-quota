@@ -32,11 +32,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+## Scheduled
+
 - [20] Review pebble-quota's architecture for deep modules and over-engineering,
   and draft the fixes
-  <!-- hai:{"id":"simple-5385fc70-974c-4eb4-bcd4-deaa7ad0b266","labels":["steward","review"],"createdAt":"2026-10-22T03:30:52.951Z","updatedAt":"2026-10-22T03:30:52.951Z"} -->
-
-## Scheduled
+  <!-- hai:{"id":"simple-5385fc70-974c-4eb4-bcd4-deaa7ad0b266","labels":["steward","review"],"createdAt":"2026-10-22T03:30:52.951Z","updatedAt":"2026-10-22T03:46:00.596Z"} -->
 
 ## In Progress
 
