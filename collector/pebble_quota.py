@@ -54,12 +54,8 @@ def utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def iso_from_epoch(value: float | str | None) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str) and not value.isdigit():
-        return value
-    return datetime.fromtimestamp(float(value), timezone.utc).isoformat().replace("+00:00", "Z")
+def iso_from_epoch(value: float) -> str:
+    return datetime.fromtimestamp(value, timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 WATCH_INT_MAX = 2**31 - 1
@@ -678,50 +674,47 @@ document.getElementById("save").addEventListener("click", function () {
 """
 
 
-def make_handler() -> type[BaseHTTPRequestHandler]:
-    class Handler(BaseHTTPRequestHandler):
-        server: QuotaServer
+class Handler(BaseHTTPRequestHandler):
+    server: QuotaServer
 
-        def do_GET(self) -> None:
-            path = urlsplit(self.path).path
-            if path == "/config":
-                body = CONFIG_PAGE.encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-                return
-            if path != "/v1/watch":
-                self.send_error(404)
-                return
-            expected = f"Bearer {self.server.token}"
-            if not self.server.token or not hmac.compare_digest(self.headers.get("Authorization", "").encode(), expected.encode()):
-                self.send_error(401)
-                return
-            try:
-                data = json.loads(self.server.snapshot.read_text())
-                payload = compact_watch(data)
-                if not payload["q"] or payload["at"] is None:
-                    raise ValueError("Snapshot unavailable")
-                body = json.dumps(payload, separators=(",", ":")).encode()
-            except Exception as exc:  # noqa: BLE001 - any unreadable snapshot is a 503, not a dropped connection
-                print(f"snapshot response failed: {diagnostic(exc)}",
-                      file=sys.stderr, flush=True)
-                self.send_error(503, "Snapshot unavailable")
-                return
+    def do_GET(self) -> None:
+        path = urlsplit(self.path).path
+        if path == "/config":
+            body = CONFIG_PAGE.encode()
             self.send_response(200)
-            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
-
-        def log_message(self, format: str, *args: Any) -> None:
             return
+        if path != "/v1/watch":
+            self.send_error(404)
+            return
+        expected = f"Bearer {self.server.token}"
+        if not self.server.token or not hmac.compare_digest(self.headers.get("Authorization", "").encode(), expected.encode()):
+            self.send_error(401)
+            return
+        try:
+            data = json.loads(self.server.snapshot.read_text())
+            payload = compact_watch(data)
+            if not payload["q"] or payload["at"] is None:
+                raise ValueError("Snapshot unavailable")
+            body = json.dumps(payload, separators=(",", ":")).encode()
+        except Exception as exc:  # noqa: BLE001 - any unreadable snapshot is a 503, not a dropped connection
+            print(f"snapshot response failed: {diagnostic(exc)}",
+                  file=sys.stderr, flush=True)
+            self.send_error(503, "Snapshot unavailable")
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
-    return Handler
+    def log_message(self, format: str, *args: Any) -> None:
+        return
 
 
 def main() -> None:
@@ -742,7 +735,7 @@ def main() -> None:
     if args.refresh_seconds < 1:
         raise SystemExit("--refresh-seconds must be positive")
 
-    server = QuotaServer((args.host, args.port), make_handler())
+    server = QuotaServer((args.host, args.port), Handler)
     server.snapshot, server.token = args.output, token
     stop = threading.Event()
     refresher = threading.Thread(

@@ -116,6 +116,12 @@ class PercentFractionTests(unittest.TestCase):
         self.assertIsNone(quota.percent_fraction(None))
 
 
+class IsoFromEpochTests(unittest.TestCase):
+    def test_formats_zero_and_fractional_epochs(self) -> None:
+        self.assertEqual(quota.iso_from_epoch(0), "1970-01-01T00:00:00Z")
+        self.assertEqual(quota.iso_from_epoch(1.5), "1970-01-01T00:00:01.500000Z")
+
+
 class CompactTests(unittest.TestCase):
     def test_compacts_and_sorts_services(self) -> None:
         data = {
@@ -411,7 +417,7 @@ class HttpTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
             output.write_text("{}")
-            server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+            server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
             server.snapshot = output
             server.token = "test-secret"
             thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -436,7 +442,7 @@ class HttpTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
             output.write_text(json.dumps(snapshot))
-            server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+            server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
             server.snapshot = output
             server.token = "test-secret"
             thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -851,7 +857,7 @@ class SecurityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
             output.write_text(json.dumps({"collected_at": "bad\r\nInjected: yes ☃"}))
-            server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+            server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
             server.snapshot, server.token = output, "fake"
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -876,7 +882,7 @@ class SecurityTests(unittest.TestCase):
 
 class StartupTests(unittest.TestCase):
     def test_busy_port_does_not_collect(self):
-        server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+        server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
         self.addCleanup(server.server_close)
         with mock.patch.dict(os.environ, {"PEBBLE_QUOTA_TOKEN": "fake"}), mock.patch.object(
                 sys, "argv", ["quota", "serve", "--port", str(server.server_port)]), mock.patch.object(
@@ -1116,7 +1122,7 @@ class ValidationTests(unittest.TestCase):
     def test_http_damaged_state_and_diagnostics_are_sanitized(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
-            server = quota.QuotaServer(("127.0.0.1", 0), quota.make_handler())
+            server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
             server.snapshot, server.token = output, "fake"
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
