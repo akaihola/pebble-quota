@@ -20,3 +20,15 @@ Extract the rate-limit result parsing into one pure provider-specific function i
 - Handoff: a short outcome; details go in this task record.
 
 Tracker: [the pebble-quota tracker](../../TASKS.md).
+
+## Plan
+
+1. Pin result decoding with direct dictionary cases for formats, percentages,
+   duration bounds, sibling salvage, ordering, duplicates and diagnostics.
+2. Extract one pure Codex decoder; retain handshake, deadline and teardown
+   coverage with fake children, including compact 1 % output.
+3. Run the focused tests and full offline unittest, Ruff and ty checks under
+   the memory guard; review, commit and merge into main.
+
+Current main still contains the F2 decoding block inside `collect_codex`;
+the review's proposed extraction applies without a behavior change.
