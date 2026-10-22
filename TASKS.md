@@ -32,6 +32,9 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [24] Remove unused collector helper generality
+  <!-- hai:{"id":"simple-446bba0e-2d7a-4660-b462-7362295c7112","labels":["steward"],"createdAt":"2026-10-22T05:11:43.566Z","updatedAt":"2026-10-22T05:11:43.566Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -104,7 +107,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -147,6 +150,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [22]: docs/tasks/22-separate-codex-result-decoding-from-rpc.md
 
 [23]: docs/tasks/23-isolate-the-unavailable-snapshot-merge.md
+
+[24]: docs/tasks/24-remove-unused-collector-helper-generality.md
 
 ## Rules
 
