@@ -34,10 +34,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Scheduled
 
-- [24] Remove unused collector helper generality
-  <!-- hai:{"id":"simple-446bba0e-2d7a-4660-b462-7362295c7112","labels":["steward"],"createdAt":"2026-10-22T05:11:43.566Z","updatedAt":"2026-10-22T05:51:01.279Z"} -->
-
 ## In Progress
+
+- [~] [24] Remove unused collector helper generality
+      <!-- hai:{"id":"simple-446bba0e-2d7a-4660-b462-7362295c7112","labels":["steward"],"createdAt":"2026-10-22T05:11:43.566Z","updatedAt":"2026-10-22T05:51:24.382Z"} -->
 
 ## Completed / Accepted
 
