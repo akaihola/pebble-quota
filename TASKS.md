@@ -36,11 +36,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [18] Check pebble-quota's documents, docstrings and comments against current
-  main
-      <!-- hai:{"id":"simple-c22eff43-a865-4beb-9131-952fb456dd6f","labels":["steward","review"],"createdAt":"2026-10-22T01:31:09.461Z","updatedAt":"2026-10-22T02:02:32.901Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [18] Check pebble-quota's documents, docstrings and comments against current
+  main
+      <!-- hai:{"id":"simple-c22eff43-a865-4beb-9131-952fb456dd6f","labels":["steward","review"],"createdAt":"2026-10-22T01:31:09.461Z","updatedAt":"2026-10-22T02:17:36.169Z"} -->
 
 - [ ] [10] Report Codex RPC failures and reap the subprocess reliably
     - Depends on: [8]
