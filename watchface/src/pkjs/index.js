@@ -1,5 +1,5 @@
 // The phone cannot reach gogo through its loopback interface. Keep the tailnet
-// endpoint as the production default; localStorage still overrides it for tests.
+// endpoint as the default; saved phone settings in localStorage override it.
 var DEFAULT_ENDPOINT = "https://gogo.crane-boa.ts.net:8450/v1/watch";
 var DEFAULT_TOKEN = "test-only-token";
 var REFRESH_MS = 15 * 60 * 1000;

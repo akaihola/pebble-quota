@@ -40,7 +40,7 @@ CODEX_DIAGNOSTICS = {
 
 
 class CodexError(RuntimeError):
-    """Only fixed, allowlisted diagnostics may leave the subprocess adapter."""
+    """RPC failure; diagnostic() publishes only allowlisted messages."""
 
 
 # Home Assistant entity for the local Koivusyrjä outside temperature (met.no forecast).
@@ -69,7 +69,7 @@ DIAGNOSTICS = {"HTTPError", "URLError", "TimeoutError", "RuntimeError", "OSError
 
 
 def epoch(value: Any) -> int | None:
-    """An integral, nonnegative watch timestamp, or None; never guess a timezone."""
+    """Return bounded Unix seconds or None; truncate timezone-aware ISO subseconds."""
     try:
         if type(value) in (int, float):
             seconds = value
@@ -181,9 +181,8 @@ def pace_points(used_fraction: float, resets_at: int, duration_seconds: int, now
     return round((elapsed_fraction - used_fraction) * 100)
 
 
-# limits[] kinds in the Anthropic usage payload, and the window each maps to. A
-# weekly_scoped entry carries a per-model scope (e.g. Fable); its key keeps the
-# model name so compact_watch can route it to its own gauge row.
+# Unscoped limits[] kinds and their windows. Only Fable's weekly_scoped entry
+# is supported; its full label lets compact_watch assign the F service code.
 CLAUDE_LIMIT_WINDOWS = {
     "session": ("5h", 18_000),
     "weekly_all": ("7d", 604_800),
@@ -192,10 +191,9 @@ CLAUDE_SCOPED_DURATION = 604_800
 
 
 def claude_windows_from_limits(limits: Any) -> dict[str, Any]:
-    """The usable windows in a limits[] payload, keyed like the legacy pair.
+    """Validated limits[] windows: 5h, 7d and optional 7d (Fable).
 
-    Entries with no percent or no resets_at are dropped: a window with no end
-    cannot be placed on a burn line. Unknown kinds are skipped.
+    Unsupported kinds/scopes and invalid percentages, resets or windows are skipped.
     """
     windows: dict[str, Any] = {}
     for limit in limits if isinstance(limits, list) else []:
@@ -580,7 +578,7 @@ def refresh_snapshot(output: Path, previous: dict[str, Any] | None = None,
 
     def before_attempt(name: str, attempted_at: str) -> None:
         state["services"].setdefault(name, {})["last_attempt_at"] = attempted_at
-        # Persist before contacting a provider so a restart retains the rate limit.
+        # Persist attempt time so restarts respect the configured refresh interval.
         try:
             write_snapshot(state, output)
         except OSError as error:

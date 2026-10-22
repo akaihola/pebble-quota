@@ -33,7 +33,7 @@ typedef struct {
 static QuotaRow s_rows[MAX_ROWS];
 static int s_row_count;
 static int s_temp_tenths;   // outside temperature, tenths of degC
-static bool s_has_temp;     // false until the phone sends a temperature
+static bool s_has_temp;     // whether the latest received message included temperature
 
 static int clamp_int(int value, int low, int high) {
   return value < low ? low : (value > high ? high : value);
@@ -54,7 +54,7 @@ static GColor pace_color(int pace) {
 // ---- Calendar -------------------------------------------------------------
 
 // Copy struct tm out of localtime's static buffer. Anchor at local noon so the
-// +/- day arithmetic never lands on a DST discontinuity (localtime(3)).
+// +/- day arithmetic avoids ordinary overnight DST transitions.
 static struct tm relative_day(int days_from_today) {
   time_t now = time(NULL);
   struct tm base = *localtime(&now);
@@ -209,8 +209,8 @@ static void draw_combined_gauge(GContext *ctx, const QuotaRow *first, const Quot
                                 const char *title, const char *status, int y, int rh, time_t now) {
   draw_gauge_label(ctx, title, status, y);
 
-  // Two color bars share one gauge with a 1px gap; one window marker spans both
-  // because both windows reset together.
+  // Two bars with a 1px gap share the first row's marker. This assumes equal
+  // resets and durations; the caller pairs by identity without checking them.
   int bar_h = clamp_int((rh - 17 - 1) / 2, 3, 10);
   int first_y = y + rh - 2 * bar_h - 2;
   int second_y = first_y + bar_h + 1;
@@ -245,7 +245,7 @@ static void canvas_update(Layer *layer, GContext *ctx) {
                      GTextAlignmentCenter, NULL);
   if (s_has_temp) {
     char temp[8];
-    // Round tenths to whole degrees, away from zero, and show e.g. "22°".
+    // Round tenths to nearest whole degree, ties away from zero, e.g. "22°".
     int deg = (s_temp_tenths >= 0 ? s_temp_tenths + 5 : s_temp_tenths - 5) / 10;
     snprintf(temp, sizeof(temp), "%d°", deg);
     graphics_draw_text(ctx, temp, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD),
@@ -275,8 +275,7 @@ static void canvas_update(Layer *layer, GContext *ctx) {
                        GRect(12, PACE_TOP + 8, w - 24, avail - 8),
                        GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
   } else {
-    // The Claude 7d and Fable 7d rows share one gauge: two color bars with one
-    // window marker, since both windows reset together.
+    // Pair weekly Claude/Fable rows by identity; see draw_combined_gauge.
     int claude_7d = find_row('C', "7d");
     int fable_7d = find_row('F', "7d");
     bool paired = claude_7d >= 0 && fable_7d >= 0;

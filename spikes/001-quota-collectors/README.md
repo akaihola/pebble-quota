@@ -1,36 +1,38 @@
-# 001: Quota collectors
+# 001: Quota collectors — historical spike
 
-**Question:** Can `gogo` obtain live five-hour and weekly usage percentages and reset times for Claude Code and Codex without screen scraping or exposing credentials?
+**Question:** Could `gogo` obtain five-hour and weekly usage percentages and
+reset times for Claude Code and Codex without screen scraping or exposing
+credentials?
 
-## Given / When / Then
+This records the original successful experiment. Use the [production collector]
+and [collector guide] for current commands and behavior. The [prototype] is
+preserved as historical code; it has not received the production percentage,
+validation, cooldown, subprocess or security fixes.
 
-Given the existing authenticated Claude Code and Codex installations, when this probe runs, then it should emit normalized JSON containing `used_fraction`, `resets_at`, and `duration_seconds` for each available quota window.
+## Original approach and result
 
-## Approaches
+Given authenticated Claude Code and Codex installations, the probe attempted to
+emit normalized JSON with `used_fraction`, `resets_at` and `duration_seconds` for
+each available window. It used Claude's undocumented OAuth usage endpoint and
+Codex's local `account/rateLimits/read` JSON-RPC method.
 
-- **Claude Code:** call the OAuth usage endpoint used by Claude Code itself. This endpoint is undocumented and therefore guarded by explicit error output.
-- **Codex:** use the supported local `codex app-server` JSON-RPC method `account/rateLimits/read`.
+The original run reported live Claude `5h` and `7d` windows and live Codex quota,
+with no credentials observed in its output. That historical result does not
+establish current CLI compatibility or guarantee safe output from the prototype:
+its error path prints raw exception text.
 
-## Run
+Codex `primary` and `secondary` were not stable names for five-hour and weekly
+windows. Only a 10,080-minute window was present on the tested account. This led
+to labeling windows by `windowDurationMins`.
 
-```bash
-python3 spikes/001-quota-collectors/probe.py
-```
+## Outcome
 
-No credential value is printed or written.
+The recommendation to promote the experiment into a standard-library service
+with a compact authenticated endpoint has been implemented in the [production
+collector]. The prototype's magnitude-based percentage conversion remains
+obsolete: it treats a provider value of `1` as a fraction rather than 1%.
+No second production collector is maintained here.
 
-## Verdict: VALIDATED
-
-### What worked
-
-- Claude returned live `5h` and `7d` windows through its OAuth usage endpoint.
-- Codex returned live quota data through `account/rateLimits/read`.
-- No credentials were printed or persisted.
-
-### Surprise
-
-Codex `primary` and `secondary` are not stable names for five-hour and weekly windows. On this account, only a 10,080-minute window was present. The collector must label windows using `windowDurationMins`.
-
-### Recommendation for the real build
-
-Promote these collectors into a small standard-library Python service, preserve missing windows rather than inventing them, and expose a compact authenticated JSON endpoint for PebbleKit JS.
+[production collector]: ../../collector/pebble_quota.py
+[collector guide]: ../../docs/collector.md
+[prototype]: probe.py

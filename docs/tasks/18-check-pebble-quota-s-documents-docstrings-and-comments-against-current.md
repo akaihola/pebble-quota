@@ -40,3 +40,77 @@ Plan:
 
 Only one heavy command runs at a time. No authenticated provider, device,
 emulator, phone or release run is part of this source review.
+
+### Outcome and scope
+
+Read all five eligible Markdown documents and all collector/watchface text
+sources against main `9a572d2`. Corrected stale instructions and comments,
+shortened the root entry point, and centralized the collector schema/settings
+in the [collector reference]. The [documentation review] inventories every
+document, lists changes with matching code, records uncertainties and ends with
+one unfiled draft issue for checker policy. Existing proposals own the remaining
+behavior and operational gaps; no new issue or thread was created.
+
+Only documents, docstrings and comments changed. Other task files, previous
+reviews, the dated architecture review, tests, build/release configuration and
+executable content are unchanged. No formatting-only exception was needed.
+
+### Checks
+
+- **Main baseline:** `python3 -m unittest discover -s tests -v`, Python 3.14.7,
+  66 passed, zero failures/errors/skips; suite time 15.887 seconds.
+- **Final worktree:** the same command, 66 passed, zero failures/errors/skips;
+  suite time 12.897 seconds. Compared all test identities and outcomes with the
+  baseline; the test source is byte-identical.
+- **Syntax and CLI:** `node --check watchface/src/pkjs/index.js` and
+  `python3 collector/pebble_quota.py --help` passed before and after the edits.
+- **Text-only proof:** Python AST comparison after removing docstrings matched
+  main for the collector/build script; string-aware comment removal matched
+  C/JS executable content. Git comparison confirmed protected files unchanged.
+- **Document checks:** local relative links and heading anchors resolve;
+  the generated PBW link is intentionally absent until a build. New/edited
+  guide and review headings meet the 60-character limit. `git diff --check`
+  passed. Temporary synthetic assertions with all providers mocked confirmed
+  whole-snapshot temperature retention and the published example payload.
+- **Existing checker failures:** the edit tool automatically ran Ruff and `ty`.
+  Explicit `ruff check --output-format json` and `ty check --output-format concise`
+  comparisons on the unchanged main collector and edited collector both exited
+  1 with identical diagnostic identities: seven Ruff findings (`EXE001`, `UP035`,
+  `PYI041`, four `BLE001`) and four type findings (optional timestamp subtraction,
+  three server-attribute errors). These are not passing checks; no suppression
+  or executable fix was made. The repository specifies only unittest validation,
+  with no formatter/import-order rule. The review's D1 proposes a separate
+  checker-policy decision for the steward.
+- **Scope limits:** no PBW build, emulator/device/phone check, authenticated
+  provider call, production restart or release run. Those would not establish
+  this text-only change's unchanged behavior more directly than the source
+  comparison and required tests; live compatibility and deployment remain
+  explicitly unverified in the guides and existing proposals.
+
+### Memory guard
+
+Both heavy commands ran serially, under a 180-second execution timeout with
+process-group cleanup. Admission waited for at least 2,048 MiB available (up to
+600 seconds; fallback threshold 1,536 MiB). Monitoring every 0.2 seconds would
+stop the command and children below 1,024 MiB or above 512 MiB swap growth.
+
+- **Baseline suite — started at once.** Command:
+  `python3 -m unittest discover -s tests -v`. Admission wait 0.00 seconds;
+  admission MemAvailable 2,543.35 MiB; final 2,469.16 MiB. Starting swap use
+  2,398.54 MiB; swap growth -3.75 MiB. Guarded execution elapsed 17.20 seconds;
+  completion exit 0.
+- **Final suite — started at once.** Command:
+  `python3 -m unittest discover -s tests -v`. Admission wait 0.00 seconds;
+  admission MemAvailable 2,378.50 MiB; final 2,412.85 MiB. Starting swap use
+  2,372.63 MiB; swap growth -0.50 MiB. Guarded execution elapsed 14.00 seconds;
+  completion exit 0.
+
+### Handoff
+
+No owner decision is required for this documentation change. The steward owns
+the recorded follow-ups and acceptance; completion leaves the checkbox empty.
+The branch and worktree will be retained after the local main merge. No push,
+deployment, release or message to another person is part of this handoff.
+
+[collector reference]: ../collector.md
+[documentation review]: ../reviews/2026-10-22-docs-review.md
