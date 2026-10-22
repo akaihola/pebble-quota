@@ -32,9 +32,6 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [21] Use one compact payload decision for HTTP
-  <!-- hai:{"id":"simple-6988dc7b-6270-4019-b391-03a6b66820f4","labels":["steward"],"createdAt":"2026-10-22T04:21:10.465Z","updatedAt":"2026-10-22T04:21:10.465Z"} -->
-
 - [22] Separate Codex result decoding from RPC
   <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T04:21:11.751Z"} -->
 
@@ -42,6 +39,9 @@ Rules for TASKS.md usage are at the bottom of the file.
   <!-- hai:{"id":"simple-fa638f7f-2f94-4695-8677-8a989fa2da47","labels":["steward"],"createdAt":"2026-10-22T04:21:13.386Z","updatedAt":"2026-10-22T04:21:13.386Z"} -->
 
 ## Scheduled
+
+- [21] Use one compact payload decision for HTTP
+  <!-- hai:{"id":"simple-6988dc7b-6270-4019-b391-03a6b66820f4","labels":["steward"],"createdAt":"2026-10-22T04:21:10.465Z","updatedAt":"2026-10-22T04:21:35.692Z"} -->
 
 ## In Progress
 
