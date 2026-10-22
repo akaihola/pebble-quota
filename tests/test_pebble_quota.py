@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import builtins
 import contextlib
-import io
-import socket
-import shutil
-import subprocess
-import sys
 import importlib.util
+import io
 import json
 import os
+import shutil
+import socket
+import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from email.message import Message
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar, Self
 from unittest import mock
 
 MODULE_PATH = Path(__file__).parents[1] / "collector/pebble_quota.py"
@@ -185,16 +185,16 @@ class RefreshTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
             output.write_text(json.dumps(previous))
-            with mock.patch.object(quota, "collect_all", return_value=failed):
-                with self.assertRaisesRegex(RuntimeError, "preserving previous"):
-                    quota.refresh_snapshot(output)
+            with mock.patch.object(quota, "collect_all", return_value=failed), \
+                 self.assertRaisesRegex(RuntimeError, "preserving previous"):
+                quota.refresh_snapshot(output)
             saved = json.loads(output.read_text())
             self.assertEqual(saved["collected_at"], previous["collected_at"])
             self.assertEqual(saved["services"]["claude"]["windows"], previous["services"]["claude"]["windows"])
 
 
 class ClaudeBackoffTests(unittest.TestCase):
-    PAYLOAD = {"five_hour": {"utilization": 20, "resets_at": 18000}}
+    PAYLOAD: ClassVar[dict[str, Any]] = {"five_hour": {"utilization": 20, "resets_at": 18000}}
 
     def setUp(self) -> None:
         directory = self.enterContext(tempfile.TemporaryDirectory())
@@ -417,7 +417,7 @@ class _FakeResponse:
     def __init__(self, payload: object) -> None:
         self._body = json.dumps(payload).encode()
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc: object) -> bool:
@@ -433,7 +433,7 @@ def _urlopen_returning(payload: object):
 
 class TemperatureTests(unittest.TestCase):
     NOW = 1_800_000_000
-    STATE = {
+    STATE: ClassVar[dict[str, Any]] = {
         "state": "sunny", "last_updated": "2027-01-15T08:00:00Z",
         "attributes": {"temperature": 22.2, "temperature_unit": "°C"},
     }
@@ -524,7 +524,7 @@ class TemperatureTests(unittest.TestCase):
         self.enterContext(mock.patch.object(quota, "collect_claude", return_value=claude))
         self.enterContext(mock.patch.object(quota, "collect_codex", return_value={"windows": {}}))
         for error in (urllib.error.URLError("connection refused"), TimeoutError("HA slow"),
-                      urllib.error.HTTPError("http://ha.invalid", 401, "Unauthorized", {}, None),
+                      urllib.error.HTTPError("http://ha.invalid", 401, "Unauthorized", Message(), None),
                       json.JSONDecodeError("invalid JSON", "bad", 0)):
             with self.subTest(error=type(error).__name__):
                 if isinstance(error, urllib.error.HTTPError):
@@ -553,10 +553,10 @@ class TemperatureTests(unittest.TestCase):
 
 class CollectAllTemperatureTests(unittest.TestCase):
     def test_temperature_recorded_when_available(self) -> None:
-        with mock.patch.object(quota, "collect_claude", return_value={"windows": {}}):
-            with mock.patch.object(quota, "collect_codex", return_value={"windows": {}}):
-                with mock.patch.object(quota, "collect_temperature", return_value=222):
-                    data = quota.collect_all()
+        with mock.patch.object(quota, "collect_claude", return_value={"windows": {}}), \
+             mock.patch.object(quota, "collect_codex", return_value={"windows": {}}), \
+             mock.patch.object(quota, "collect_temperature", return_value=222):
+            data = quota.collect_all()
         self.assertEqual(data["temperature_c_tenths"], 222)
         self.assertNotIn("temperature_error", data)
 
@@ -568,10 +568,10 @@ class CollectAllTemperatureTests(unittest.TestCase):
         def boom() -> int:
             raise TimeoutError("HA slow")
 
-        with mock.patch.object(quota, "collect_claude", return_value=claude):
-            with mock.patch.object(quota, "collect_codex", return_value={"windows": {}}):
-                with mock.patch.object(quota, "collect_temperature", side_effect=boom):
-                    data = quota.collect_all()
+        with mock.patch.object(quota, "collect_claude", return_value=claude), \
+             mock.patch.object(quota, "collect_codex", return_value={"windows": {}}), \
+             mock.patch.object(quota, "collect_temperature", side_effect=boom):
+            data = quota.collect_all()
         # Quota survives the temperature outage.
         self.assertTrue(quota.has_quota_data(data))
         self.assertNotIn("temperature_c_tenths", data)
@@ -593,7 +593,7 @@ class CollectAllTemperatureTests(unittest.TestCase):
 
 
 class ClaudeCollectTests(unittest.TestCase):
-    LIMITS = [
+    LIMITS: ClassVar[list[dict[str, Any]]] = [
         {"kind": "session", "percent": 5,
          "resets_at": "2026-08-03T22:59:59+00:00", "scope": None},
         {"kind": "weekly_all", "percent": 40,
@@ -609,11 +609,10 @@ class ClaudeCollectTests(unittest.TestCase):
             Path(home, ".claude").mkdir(parents=True)
             Path(credentials).write_text(json.dumps(
                 {"claudeAiOauth": {"accessToken": "test-token"}}))
-            with mock.patch.dict(os.environ, {"HOME": home}):
-                with mock.patch.object(
-                    quota, "provider_urlopen", _urlopen_returning(payload)
-                ):
-                    return quota.collect_claude()
+            with mock.patch.dict(os.environ, {"HOME": home}), mock.patch.object(
+                quota, "provider_urlopen", _urlopen_returning(payload)
+            ):
+                return quota.collect_claude()
 
     def test_limits_percentages(self) -> None:
         for percent, expected in ((0, 0.0), (1, 0.01), (100, 1.0)):
@@ -672,9 +671,9 @@ class SecurityTests(unittest.TestCase):
             Path("/home/agent/.claude/.credentials.json").read_text()
         with self.assertRaises(LiveAccessError):
             quota.collect_codex()
-        with self.assertRaises(LiveAccessError):
-            with mock.patch.object(quota, "collect_claude", side_effect=LiveAccessError("blocked")):
-                quota.collect_all()
+        with self.assertRaises(LiveAccessError), \
+             mock.patch.object(quota, "collect_claude", side_effect=LiveAccessError("blocked")):
+            quota.collect_all()
 
     def test_snapshot_is_private_and_does_not_follow_fixed_temp_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -691,9 +690,9 @@ class SecurityTests(unittest.TestCase):
                 os.umask(old_umask)
             self.assertEqual(victim.read_text(), "untouched")
             self.assertEqual(json.loads(output.read_text()), {"value": 2})
-            with mock.patch.object(quota.os, "replace", side_effect=OSError("disk full")):
-                with self.assertRaises(OSError):
-                    quota.write_snapshot({}, output)
+            with mock.patch.object(quota.os, "replace", side_effect=OSError("disk full")), \
+                 self.assertRaises(OSError):
+                quota.write_snapshot({}, output)
             self.assertEqual(sorted(p.name for p in Path(directory).iterdir()),
                              ["latest.json", "latest.json.tmp", "victim"])
 
@@ -719,6 +718,7 @@ class SecurityTests(unittest.TestCase):
                    "HASS_TOKEN": "fake", "OPENAI_API_KEY": "fake", "OTHER_SECRET": "fake", "LC_API_KEY": "fake"}
             def fake_codex(*args, **kwargs):
                 process = _REAL_POPEN(*args, **kwargs)
+                assert process.stdin and process.stdout
                 self.addCleanup(process.stdin.close)
                 self.addCleanup(process.stdout.close)
                 return process
@@ -743,9 +743,11 @@ class SecurityTests(unittest.TestCase):
             makefile = Path(__file__).parents[1] / "watchface/Makefile"
             env = {"HOME": directory, "PATH": directory + os.pathsep + _TOOL_PATH,
                    "LANG": "C.UTF-8", "HASS_TOKEN": "fake", "BUILD_API_KEY": "fake"}
+            make = shutil.which("make", path=_TOOL_PATH)
+            bash = shutil.which("bash", path=_TOOL_PATH)
+            assert make and bash
             with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
-                subprocess.run([shutil.which("make", path=_TOOL_PATH), "-f", str(makefile),
-                                "SHELL=" + shutil.which("bash", path=_TOOL_PATH), "clean", "build"],
+                subprocess.run([make, "-f", str(makefile), "SHELL=" + bash, "clean", "build"],
                                cwd=directory, env=env, check=True, capture_output=True)
             for command in ("clean", "build"):
                 captured = json.loads((root / (command + ".json")).read_text())
@@ -857,7 +859,7 @@ class StartupTests(unittest.TestCase):
         stop.is_set.return_value = False
         stop.wait.side_effect = [False, False, True]
         times = iter((1000, 1000, 1300, 1600, 1600))
-        error = urllib.error.HTTPError("https://fake.invalid", 429, "limited", {}, None)
+        error = urllib.error.HTTPError("https://fake.invalid", 429, "limited", Message(), None)
         with tempfile.TemporaryDirectory() as directory, \
              mock.patch.object(quota, "utc_iso", side_effect=lambda: quota.iso_from_epoch(next(times))), \
              mock.patch.object(quota, "collect_claude", side_effect=error) as claude, \
@@ -872,7 +874,7 @@ class StartupTests(unittest.TestCase):
 
 
 class ValidationTests(unittest.TestCase):
-    WINDOW = {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}
+    WINDOW: ClassVar[dict[str, Any]] = {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}
 
     def snapshot(self, windows=None, name="claude"):
         return {"collected_at": quota.iso_from_epoch(0), "services": {
@@ -946,8 +948,8 @@ class ValidationTests(unittest.TestCase):
 
     def test_damaged_disk_state_cannot_block_healthy_collection(self):
         states = [None, "{broken", "[1]", "null", '"bad"', '{"services": []}',
-                  '{"services": {"claude": {"last_attempt_at": [], "retry_at": {},'
-                  '"rate_limit_failures": "bad", "windows": []}, "codex": []}}']
+                  ('{"services": {"claude": {"last_attempt_at": [], "retry_at": {},'
+                   '"rate_limit_failures": "bad", "windows": []}, "codex": []}}')]
         for state in states:
             with self.subTest(state=state), tempfile.TemporaryDirectory() as directory:
                 output = Path(directory) / "latest.json"
@@ -966,7 +968,7 @@ class ValidationTests(unittest.TestCase):
             output = Path(directory) / "latest.json"
             good = self.snapshot(name="codex")
             quota.write_snapshot(good, output)
-            error = urllib.error.HTTPError("https://fake.invalid", 429, "secret", {}, None)
+            error = urllib.error.HTTPError("https://fake.invalid", 429, "secret", Message(), None)
             with mock.patch.object(quota, "utc_iso", return_value=quota.iso_from_epoch(300)), \
                  mock.patch.object(quota, "collect_claude", side_effect=error) as claude, \
                  mock.patch.object(quota, "collect_codex", return_value={"windows": {"5h": {"used": 1}}}) as codex, \
@@ -1005,7 +1007,7 @@ class ValidationTests(unittest.TestCase):
     def test_first_429_without_rows_is_unavailable_but_survives_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
-            error = urllib.error.HTTPError("https://fake.invalid", 429, "secret", {}, None)
+            error = urllib.error.HTTPError("https://fake.invalid", 429, "secret", Message(), None)
             with mock.patch.object(quota, "utc_iso", return_value=quota.iso_from_epoch(300)), \
                  mock.patch.object(quota, "collect_claude", side_effect=error) as claude, \
                  mock.patch.object(quota, "collect_codex", side_effect=RuntimeError("secret")) as codex, \
@@ -1027,9 +1029,9 @@ class ValidationTests(unittest.TestCase):
             failed = {"services": {"claude": {"retry_at": quota.iso_from_epoch(900),
                                              "error": "HTTPError"}}}
             with mock.patch.object(quota, "collect_all", return_value=failed), \
-                 mock.patch.object(quota.os, "replace", side_effect=OSError("secret")):
-                with self.assertRaises(OSError):
-                    quota.refresh_snapshot(output, state)
+                 mock.patch.object(quota.os, "replace", side_effect=OSError("secret")), \
+                 self.assertRaises(OSError):
+                quota.refresh_snapshot(output, state)
             self.assertEqual(output.read_bytes(), original)
             self.assertEqual(quota.epoch(state["services"]["claude"]["retry_at"]), 900)
             self.assertEqual(list(Path(directory).iterdir()), [output])

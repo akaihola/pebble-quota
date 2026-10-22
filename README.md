@@ -33,18 +33,24 @@ From the repository root:
 
 ```bash
 python3 -m unittest discover -s tests -v
+ruff check .
+ty check
 ```
 
 The suite uses synthetic provider responses, fake subprocesses and loopback HTTP
-servers; it blocks real provider access. CI currently builds and checks the watch
-bundle but does not run this suite. See the [task tracker] for completed work and
-unverified proposals, and the [documentation review] for this source check's
-findings. Live deployment and installed Codex CLI compatibility were not verified
-by that check.
+servers; it blocks real provider access. [Ruff] and [ty] run with their default
+rules, without project configuration, and report no findings; a `noqa: BLE001`
+comment explains each deliberate broad `except`. CI currently builds and checks
+the watch bundle but runs neither the suite nor these checks. See the [task
+tracker] for completed work and unverified proposals, and the [documentation
+review] for this source check's findings. Live deployment and installed Codex CLI
+compatibility were not verified by that check.
 
 [collector guide]: docs/collector.md
 [GitHub releases]: https://github.com/akaihola/pebble-quota/releases/latest
 [watchface guide]: watchface/README.md
 [screenshot]: watchface/quota-pace.png
+[Ruff]: https://docs.astral.sh/ruff/
+[ty]: https://docs.astral.sh/ty/
 [task tracker]: TASKS.md
 [documentation review]: docs/reviews/2026-10-22-docs-review.md

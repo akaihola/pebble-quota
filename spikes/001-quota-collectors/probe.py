@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """PROTOTYPE: read Claude Code and Codex quota windows without exposing credentials."""
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 
-def iso_from_epoch(value: int | float | str | None) -> str | None:
+def iso_from_epoch(value: float | str | None) -> str | None:
     if value is None:
         return None
     if isinstance(value, str) and not value.isdigit():
@@ -23,7 +22,7 @@ def iso_from_epoch(value: int | float | str | None) -> str | None:
     return datetime.fromtimestamp(float(value), timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def fraction(value: int | float | None) -> float | None:
+def fraction(value: float | None) -> float | None:
     if value is None:
         return None
     result = float(value)
@@ -142,7 +141,7 @@ def main() -> None:
     for name, collector in (("claude", collect_claude), ("codex", collect_codex)):
         try:
             output["services"][name] = collector()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - isolate providers; report each failure
             output["services"][name] = {"service": name, "error": f"{type(exc).__name__}: {exc}"}
     print(json.dumps(output, indent=2, sort_keys=True))
 

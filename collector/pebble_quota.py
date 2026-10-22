@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Collect Claude Code and Codex quota windows and serve them to PebbleKit JS."""
 
 from __future__ import annotations
@@ -17,11 +16,12 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlsplit
 
 DURATIONS = {300: "5h", 10_080: "7d"}
@@ -53,7 +53,7 @@ def utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def iso_from_epoch(value: int | float | str | None) -> str | None:
+def iso_from_epoch(value: float | str | None) -> str | None:
     if value is None:
         return None
     if isinstance(value, str) and not value.isdigit():
@@ -491,7 +491,7 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
                 output["services"][name].setdefault("error", "Invalid quota windows")
             if name == "claude" and output["services"][name].get("windows"):
                 output["services"][name]["last_success_at"] = output["collected_at"]
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - isolate providers; record, then collect the next
             service = {"service": name, "error": diagnostic(exc)}
             output["services"][name] = service
             if name == "claude" and isinstance(exc, urllib.error.HTTPError) and exc.code == 429:
@@ -515,7 +515,7 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
     # quota delivery, so record the error and omit the value rather than raise.
     try:
         tenths = collect_temperature()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - best-effort, see above
         output["temperature_error"] = diagnostic(exc)
     else:
         if tenths is not None:
@@ -599,10 +599,11 @@ def refresh_snapshot(output: Path, previous: dict[str, Any] | None = None,
             if old.get("windows"):
                 old["stale"] = True
                 last_success = old.get("last_success_at", state.get("collected_at"))
-                if epoch(last_success) is not None:
+                success_epoch = epoch(last_success)
+                if success_epoch is not None:
                     old["last_success_at"] = last_success
                     old["age_seconds"] = max(0, (epoch(data.get("collected_at")) or 0)
-                                             - epoch(last_success))
+                                             - success_epoch)
         data = state
     if previous is not None:
         previous.clear()
@@ -619,7 +620,7 @@ def refresh_forever(output: Path, interval_seconds: int, stop: threading.Event) 
     while not stop.is_set():
         try:
             refresh_snapshot(output, previous, interval_seconds)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - keep refreshing and serving after any failure
             print(f"quota refresh failed: {diagnostic(error)}", file=sys.stderr, flush=True)
         if stop.wait(interval_seconds):
             break
@@ -665,6 +666,8 @@ document.getElementById("save").addEventListener("click", function () {
 
 def make_handler() -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
+        server: QuotaServer
+
         def do_GET(self) -> None:
             path = urlsplit(self.path).path
             if path == "/config":
@@ -679,16 +682,16 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
             if path != "/v1/watch":
                 self.send_error(404)
                 return
-            expected = f"Bearer {self.server.token}"  # type: ignore[attr-defined]
-            if not self.server.token or not hmac.compare_digest(self.headers.get("Authorization", "").encode(), expected.encode()):  # type: ignore[attr-defined]
+            expected = f"Bearer {self.server.token}"
+            if not self.server.token or not hmac.compare_digest(self.headers.get("Authorization", "").encode(), expected.encode()):
                 self.send_error(401)
                 return
             try:
-                data = json.loads(self.server.snapshot.read_text())  # type: ignore[attr-defined]
+                data = json.loads(self.server.snapshot.read_text())
                 if not has_quota_data(data) or epoch(data.get("collected_at")) is None:
                     raise ValueError("Snapshot unavailable")
                 body = json.dumps(compact_watch(data), separators=(",", ":")).encode()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - any unreadable snapshot is a 503, not a dropped connection
                 print(f"snapshot response failed: {diagnostic(exc)}",
                       file=sys.stderr, flush=True)
                 self.send_error(503, "Snapshot unavailable")
