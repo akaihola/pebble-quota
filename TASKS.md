@@ -37,10 +37,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Scheduled
 
-- [22] Separate Codex result decoding from RPC
-  <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T04:46:57.342Z"} -->
-
 ## In Progress
+
+- [~] [22] Separate Codex result decoding from RPC
+      <!-- hai:{"id":"simple-0c61a35c-ed10-43a8-ba83-09adad3b0348","labels":["steward"],"createdAt":"2026-10-22T04:21:11.751Z","updatedAt":"2026-10-22T04:47:18.800Z"} -->
 
 ## Completed / Accepted
 
