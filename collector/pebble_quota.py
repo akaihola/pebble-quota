@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import copy
 import hmac
 import json
 import math
@@ -575,6 +576,29 @@ def has_quota_data(data: Any) -> bool:
                for service in normalize_snapshot(data)["services"].values())
 
 
+def merge_unavailable_snapshot(previous: dict[str, Any], attempted: dict[str, Any]) -> dict[str, Any]:
+    """Previous quota, collection time and temperature plus attempted service metadata.
+
+    Both are normalized snapshots and attempted has no quota rows; neither is
+    modified. Attempt, cooldown and error fields replace old ones. A scheduling-only
+    snapshot is never a successful quota read, so retained rows become stale and
+    age from their last success until the attempted collection time.
+    """
+    merged = copy.deepcopy(previous)
+    for name, service in attempted["services"].items():
+        old = merged["services"].setdefault(name, {})
+        old.update(service)
+        if old.get("windows"):
+            old["stale"] = True
+            last_success = old.get("last_success_at", previous.get("collected_at"))
+            success_epoch = epoch(last_success)
+            if success_epoch is not None:
+                old["last_success_at"] = last_success
+                old["age_seconds"] = max(0, (epoch(attempted.get("collected_at")) or 0)
+                                         - success_epoch)
+    return merged
+
+
 def refresh_snapshot(output: Path, previous: dict[str, Any] | None = None,
                      interval_seconds: int = 0) -> dict[str, Any]:
     state = load_snapshot(output) if previous is None else normalize_snapshot(previous)
@@ -594,20 +618,7 @@ def refresh_snapshot(output: Path, previous: dict[str, Any] | None = None,
     available = has_quota_data(data)
     retained = has_quota_data(state)
     if not available:
-        # Retain quota and its collection time, while still saving attempt/cooldown
-        # metadata. A scheduling-only snapshot is never a successful quota read.
-        for name, service in data["services"].items():
-            old = state["services"].setdefault(name, {})
-            old.update(service)
-            if old.get("windows"):
-                old["stale"] = True
-                last_success = old.get("last_success_at", state.get("collected_at"))
-                success_epoch = epoch(last_success)
-                if success_epoch is not None:
-                    old["last_success_at"] = last_success
-                    old["age_seconds"] = max(0, (epoch(data.get("collected_at")) or 0)
-                                             - success_epoch)
-        data = state
+        data = merge_unavailable_snapshot(state, data)
     if previous is not None:
         previous.clear()
         previous.update(data)  # Keep cooldown in memory even when disk writes fail.

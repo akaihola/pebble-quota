@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import contextlib
+import copy
 import importlib.util
 import io
 import json
@@ -191,6 +192,60 @@ class RefreshTests(unittest.TestCase):
             saved = json.loads(output.read_text())
             self.assertEqual(saved["collected_at"], previous["collected_at"])
             self.assertEqual(saved["services"]["claude"]["windows"], previous["services"]["claude"]["windows"])
+
+
+class UnavailableMergeTests(unittest.TestCase):
+    WINDOWS: ClassVar[dict[str, Any]] = {"5h": {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}}
+
+    def test_keeps_old_quota_time_and_temperature_with_new_attempts(self):
+        previous = {"collected_at": quota.iso_from_epoch(100), "services": {
+            "claude": {"windows": self.WINDOWS, "last_success_at": quota.iso_from_epoch(40),
+                       "last_attempt_at": quota.iso_from_epoch(100), "error": "Invalid quota windows"},
+            "codex": {"windows": self.WINDOWS},
+        }, "temperature_c_tenths": 222}
+        claude = {"service": "claude", "error": "HTTPError", "rate_limit_failures": 2,
+                  "retry_at": quota.iso_from_epoch(1600), "last_attempt_at": quota.iso_from_epoch(400)}
+        codex = {"service": "codex", "error": "RuntimeError", "last_attempt_at": quota.iso_from_epoch(400)}
+        attempted = {"collected_at": quota.iso_from_epoch(400), "services": {"claude": claude, "codex": codex},
+                     "temperature_error": "URLError"}
+        inputs = copy.deepcopy((previous, attempted))
+        merged = quota.merge_unavailable_snapshot(previous, attempted)
+        self.assertEqual((previous, attempted), inputs)
+        self.assertEqual(merged, {"collected_at": quota.iso_from_epoch(100), "services": {
+            "claude": dict(claude, windows=self.WINDOWS, last_success_at=quota.iso_from_epoch(40),
+                           stale=True, age_seconds=360),
+            "codex": dict(codex, windows=self.WINDOWS, last_success_at=quota.iso_from_epoch(100),
+                          stale=True, age_seconds=300),
+        }, "temperature_c_tenths": 222})
+
+    def test_stale_age_counts_from_last_success_or_old_collection(self):
+        attempted = {"collected_at": quota.iso_from_epoch(400), "services": {"codex": {"error": "RuntimeError"}}}
+        for collected_at, last_success, expected in (
+                (100, None, {"last_success_at": quota.iso_from_epoch(100), "age_seconds": 300}),
+                (100, 40, {"last_success_at": quota.iso_from_epoch(40), "age_seconds": 360}),
+                (100, 500, {"last_success_at": quota.iso_from_epoch(500), "age_seconds": 0}),
+                (None, None, {})):
+            with self.subTest(collected_at=collected_at, last_success=last_success):
+                service: dict[str, Any] = {"windows": self.WINDOWS}
+                if last_success is not None:
+                    service["last_success_at"] = quota.iso_from_epoch(last_success)
+                previous: dict[str, Any] = {"services": {"codex": service}}
+                if collected_at is not None:
+                    previous["collected_at"] = quota.iso_from_epoch(collected_at)
+                merged = quota.merge_unavailable_snapshot(previous, attempted)
+                self.assertEqual(merged["services"]["codex"], dict(
+                    windows=self.WINDOWS, error="RuntimeError", stale=True, **expected))
+
+    def test_empty_previous_state_stays_unavailable(self):
+        attempted = {"collected_at": quota.iso_from_epoch(300), "services": {
+            "claude": {"service": "claude", "error": "HTTPError", "rate_limit_failures": 1,
+                       "retry_at": quota.iso_from_epoch(900), "last_attempt_at": quota.iso_from_epoch(300)},
+            "codex": {"service": "codex", "error": "RuntimeError"},
+        }, "temperature_c_tenths": 111}
+        merged = quota.merge_unavailable_snapshot({"services": {}}, attempted)
+        self.assertEqual(merged, {"services": attempted["services"]})
+        self.assertFalse(quota.has_quota_data(merged))
+        self.assertEqual(quota.compact_watch(merged, now=300), {"v": 1, "at": None, "q": []})
 
 
 class ClaudeBackoffTests(unittest.TestCase):
@@ -991,6 +1046,37 @@ class ValidationTests(unittest.TestCase):
                 self.assertEqual(saved["services"][name]["error"], "Invalid quota windows")
                 self.assertEqual(len(quota.compact_watch(saved)["q"]), 1)
 
+    def test_both_failed_publishes_retained_claude_but_keeps_whole_codex_snapshot(self):
+        claude = {"service": "claude", "error": "HTTPError", "rate_limit_failures": 1,
+                  "retry_at": quota.iso_from_epoch(900), "last_attempt_at": quota.iso_from_epoch(300)}
+        codex = {"service": "codex", "error": "RuntimeError", "last_attempt_at": quota.iso_from_epoch(300)}
+        retained = {"windows": {"5h": self.WINDOW}, "last_success_at": quota.iso_from_epoch(0),
+                    "stale": True, "age_seconds": 300}
+        expected = {
+            "claude": (300, 111, {"claude": dict(claude, **retained), "codex": codex}),
+            "codex": (0, 222, {"claude": claude, "codex": dict(codex, **retained)}),
+        }
+        for name, (at, tenths, services) in expected.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "latest.json"
+                quota.write_snapshot(dict(self.snapshot(name=name), temperature_c_tenths=222), output)
+                error = urllib.error.HTTPError("https://fake.invalid", 429, "secret", Message(), None)
+                with mock.patch.object(quota, "utc_iso", return_value=quota.iso_from_epoch(300)), \
+                     mock.patch.object(quota, "collect_claude", side_effect=error), \
+                     mock.patch.object(quota, "collect_codex", side_effect=RuntimeError("offline")), \
+                     mock.patch.object(quota, "collect_temperature", return_value=111):
+                    if name == "codex":
+                        with self.assertRaisesRegex(RuntimeError, "preserving previous"):
+                            quota.refresh_snapshot(output, interval_seconds=300)
+                    else:
+                        quota.refresh_snapshot(output, interval_seconds=300)
+                saved = json.loads(output.read_text())
+                self.assertEqual(saved, {"collected_at": quota.iso_from_epoch(at), "services": services,
+                                         "temperature_c_tenths": tenths})
+                code = "C" if name == "claude" else "X"
+                self.assertEqual(quota.compact_watch(saved, now=950), {"v": 1, "at": at, "q": [
+                    {"s": code, "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30}], "t": tenths})
+
     def test_first_429_without_rows_is_unavailable_but_survives_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
@@ -1004,7 +1090,11 @@ class ValidationTests(unittest.TestCase):
                         quota.refresh_snapshot(output, interval_seconds=300)
                 claude.assert_called_once()
                 codex.assert_called_once()
-            self.assertFalse(quota.has_quota_data(json.loads(output.read_text())))
+            self.assertEqual(json.loads(output.read_text()), {"services": {
+                "claude": {"service": "claude", "error": "HTTPError", "rate_limit_failures": 1,
+                           "retry_at": quota.iso_from_epoch(900), "last_attempt_at": quota.iso_from_epoch(300)},
+                "codex": {"service": "codex", "error": "RuntimeError", "last_attempt_at": quota.iso_from_epoch(300)},
+            }})
 
     def test_atomic_replace_failure_leaves_good_disk_and_new_memory_cooldown(self):
         with tempfile.TemporaryDirectory() as directory:

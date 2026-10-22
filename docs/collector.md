@@ -126,10 +126,11 @@ Claude failures retain its last successful windows with `error`, `stale: true`,
 Codex has no equivalent per-provider retention on a partial failure: it can
 disappear while Claude rows remain.
 
-If collection produces no usable rows, `refresh_snapshot` retains prior
-validated quota, collection time and temperature while merging service
-attempt/cooldown metadata and marking retained services stale. It writes that
-state, then raises an unavailable-reading error. With no prior quota, the
+If collection produces no usable rows, `refresh_snapshot` calls the pure
+`merge_unavailable_snapshot`, which retains prior validated quota, collection
+time and temperature while merging service attempt/cooldown metadata and
+marking retained services stale. `refresh_snapshot` writes that state, then
+raises an unavailable-reading error. With no prior quota, the
 scheduling-only snapshot is saved but is not a successful publication; HTTP
 returns 503. Retained Claude rows count as usable, so both providers failing does
 not necessarily enter this whole-snapshot fallback.
