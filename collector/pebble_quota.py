@@ -276,6 +276,37 @@ def collect_claude() -> dict[str, Any]:
     return {"service": "claude", "windows": windows}
 
 
+def codex_service_from_result(result: Any) -> dict[str, Any]:
+    """Decode Codex rate limits independently of the app-server lifecycle."""
+    if not isinstance(result, dict) or not any(
+            key in result for key in ("rateLimits", "primary", "secondary")):
+        raise CodexError("Codex rate limits: invalid result")
+    limits = result.get("rateLimits", result)
+    windows = {}
+    if not isinstance(limits, dict):
+        raise CodexError("Codex rate limits: invalid result")
+    for source in ("primary", "secondary"):
+        if not isinstance(item := limits.get(source), dict):
+            continue
+        minutes = item.get("windowDurationMins")
+        if type(minutes) is not int or not 1 <= minutes <= MAX_DURATION_SECONDS // 60:
+            continue
+        name = DURATIONS.get(minutes, f"{minutes}m")
+        window = normalize_window("codex", name, {
+            "used_fraction": percent_fraction(item.get("usedPercent")),
+            "resets_at": item.get("resetsAt"),
+            "duration_seconds": minutes * 60,
+        })
+        if window:
+            windows[name] = window
+    if not windows and any(limits.get(key) is not None for key in ("primary", "secondary")):
+        raise CodexError("Codex rate limits: invalid result")
+    data = {"service": "codex", "windows": windows}
+    if not windows:
+        data["error"] = "Codex rate limits: no quota windows"
+    return data
+
+
 def collect_codex() -> dict[str, Any]:
     proc = subprocess.Popen(
         ["codex", "app-server", "--stdio"],
@@ -354,32 +385,7 @@ def collect_codex() -> dict[str, Any]:
                 send({"id": 2, "method": "account/rateLimits/read", "params": {}})
                 request_id = 2
             else:
-                if not any(key in result for key in ("rateLimits", "primary", "secondary")):
-                    raise CodexError("Codex rate limits: invalid result")
-                limits = result.get("rateLimits", result)
-                windows = {}
-                if not isinstance(limits, dict):
-                    raise CodexError("Codex rate limits: invalid result")
-                for source in ("primary", "secondary"):
-                    if not isinstance(item := limits.get(source), dict):
-                        continue
-                    minutes = item.get("windowDurationMins")
-                    if type(minutes) is not int or not 1 <= minutes <= MAX_DURATION_SECONDS // 60:
-                        continue
-                    name = DURATIONS.get(minutes, f"{minutes}m")
-                    window = normalize_window("codex", name, {
-                        "used_fraction": percent_fraction(item.get("usedPercent")),
-                        "resets_at": item.get("resetsAt"),
-                        "duration_seconds": minutes * 60,
-                    })
-                    if window:
-                        windows[name] = window
-                if not windows and any(limits.get(key) is not None for key in ("primary", "secondary")):
-                    raise CodexError("Codex rate limits: invalid result")
-                data = {"service": "codex", "windows": windows}
-                if not windows:
-                    data["error"] = "Codex rate limits: no quota windows"
-                return data
+                return codex_service_from_result(result)
     except OSError:
         raise CodexError(f"Codex {stage}: pipe failure") from None
     finally:

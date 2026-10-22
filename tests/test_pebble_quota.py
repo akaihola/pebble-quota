@@ -933,19 +933,6 @@ class ValidationTests(unittest.TestCase):
         for limits in (1, "bad", {"kind": "session"}):
             self.assertEqual(quota.claude_windows_from_limits(limits), {})
 
-    def test_codex_malformed_primary_does_not_block_secondary(self):
-        good = {"usedPercent": 20, "resetsAt": 1000, "windowDurationMins": 300}
-        for primary in (None, [], "bad", {}, dict(good, resetsAt="bad"),
-                        dict(good, usedPercent="20"), dict(good, windowDurationMins=[])):
-            with self.subTest(primary=primary):
-                process = mock.Mock(stdin=io.StringIO(), stdout=io.StringIO(
-                    json.dumps({"id": 1, "result": {"userAgent": "fake"}}) + "\n" + json.dumps({
-                    "id": 2, "result": {"rateLimits": {"primary": primary,
-                                                         "secondary": good}}}) + "\n"))
-                with mock.patch.object(quota.subprocess, "Popen", return_value=process):
-                    data = quota.collect_codex()
-                self.assertEqual(data["windows"], {"5h": dict(self.WINDOW, duration_seconds=18000)})
-
     def test_damaged_disk_state_cannot_block_healthy_collection(self):
         states = [None, "{broken", "[1]", "null", '"bad"', '{"services": []}',
                   ('{"services": {"claude": {"last_attempt_at": [], "retry_at": {},'
@@ -1114,6 +1101,74 @@ class ValidationTests(unittest.TestCase):
                 thread.join(timeout=2)
 
 
+class CodexResultTests(unittest.TestCase):
+    WINDOW: ClassVar[dict] = {"usedPercent": 1, "resetsAt": 1000, "windowDurationMins": 300}
+
+    def test_codex_malformed_primary_does_not_block_secondary(self):
+        good = {"usedPercent": 20, "resetsAt": 1000, "windowDurationMins": 300}
+        for primary in (None, [], "bad", {}, dict(good, resetsAt="bad"),
+                        dict(good, usedPercent="20"), dict(good, windowDurationMins=[])):
+            with self.subTest(primary=primary):
+                data = quota.codex_service_from_result({
+                    "rateLimits": {"primary": primary, "secondary": good}})
+                self.assertEqual(data["windows"], {"5h": {
+                    "used_fraction": .2, "resets_at": 1000, "duration_seconds": 18000}})
+
+    def test_formats_and_percentages(self):
+        for wrapped in (False, True):
+            for used in (0, .5, 1, 2, 100):
+                with self.subTest(wrapped=wrapped, used=used):
+                    limits = {"primary": dict(self.WINDOW, usedPercent=used)}
+                    result = {"rateLimits": limits} if wrapped else limits
+                    self.assertEqual(quota.codex_service_from_result(result), {
+                        "service": "codex", "windows": {"5h": {
+                            "used_fraction": used / 100, "resets_at": 1000,
+                            "duration_seconds": 18000}}})
+
+    def test_duration_bounds_and_labels(self):
+        maximum = quota.MAX_DURATION_SECONDS // 60
+        for minutes, label in ((1, "1m"), (60, "60m"), (300, "5h"),
+                               (10080, "7d"), (maximum, f"{maximum}m")):
+            with self.subTest(minutes=minutes):
+                data = quota.codex_service_from_result({
+                    "primary": dict(self.WINDOW, windowDurationMins=minutes)})
+                self.assertEqual(list(data["windows"]), [label])
+                self.assertEqual(data["windows"][label]["duration_seconds"], minutes * 60)
+        for minutes in (0, -1, maximum + 1, True, 300.0, "300", None, []):
+            with self.subTest(minutes=minutes), self.assertRaisesRegex(
+                    quota.CodexError, "^Codex rate limits: invalid result$"):
+                quota.codex_service_from_result({
+                    "primary": dict(self.WINDOW, windowDurationMins=minutes)})
+
+    def test_window_order_and_duplicate_duration(self):
+        secondary = dict(self.WINDOW, usedPercent=2)
+        data = quota.codex_service_from_result({"secondary": secondary,
+            "primary": dict(self.WINDOW, windowDurationMins=10080)})
+        self.assertEqual(list(data["windows"]), ["7d", "5h"])
+        data = quota.codex_service_from_result({"primary": self.WINDOW, "secondary": secondary})
+        self.assertEqual(list(data["windows"]), ["5h"])
+        self.assertEqual(data["windows"]["5h"]["used_fraction"], .02)
+
+    def test_invalid_results_and_missing_usage(self):
+        missing = {key: value for key, value in self.WINDOW.items() if key != "usedPercent"}
+        for result in (None, [], "bad", {}, {"userAgent": []}, {"rateLimits": None},
+                       {"rateLimits": []}, {"primary": []}, {"primary": missing},
+                       {"primary": dict(self.WINDOW, usedPercent="bad")},
+                       {"rateLimits": None, "primary": self.WINDOW}):
+            with self.subTest(result=result):
+                with self.assertRaises(quota.CodexError) as caught:
+                    quota.codex_service_from_result(result)
+                self.assertEqual(quota.diagnostic(caught.exception), "Codex rate limits: invalid result")
+
+    def test_explicit_no_windows(self):
+        for result in ({"rateLimits": {}}, {"rateLimits": {"primary": None, "secondary": None}},
+                       {"primary": None, "secondary": None}):
+            with self.subTest(result=result):
+                self.assertEqual(quota.codex_service_from_result(result), {
+                    "service": "codex", "windows": {},
+                    "error": "Codex rate limits: no quota windows"})
+
+
 class CodexRPCTests(unittest.TestCase):
     INITIALIZE: ClassVar[dict] = {"id": 1, "result": {"userAgent": "fake-app-server"}}
     WINDOW: ClassVar[dict] = {"usedPercent": 1, "resetsAt": 1000, "windowDurationMins": 300}
@@ -1167,7 +1222,7 @@ class CodexRPCTests(unittest.TestCase):
             quota.collect_codex()
         self.assertEqual(quota.diagnostic(caught.exception), expected)
 
-    def test_success_notifications_and_duration_labels(self):
+    def test_success_notifications_and_compact_percentage(self):
         result = {"rateLimits": {"primary": self.WINDOW,
                   "secondary": dict(self.WINDOW, windowDurationMins=10080)}}
         replies = self.replies(result)
@@ -1178,8 +1233,7 @@ class CodexRPCTests(unittest.TestCase):
             data = quota.collect_codex()
         self.assertEqual(list(data["windows"]), ["5h", "7d"])
         self.assertEqual(data["windows"]["5h"]["used_fraction"], .01)
-        with self.server(self.replies({"primary": dict(self.WINDOW, windowDurationMins=60)})):
-            self.assertEqual(list(quota.collect_codex()["windows"]), ["60m"])
+        self.assertEqual(quota.compact_watch({"services": {"codex": data}}, now=1000)["q"][0]["u"], 1)
 
     def test_both_rpc_errors_are_sanitized_and_other_rows_survive(self):
         error = {"code": -32000, "message": "fixture-only", "data": "fixture-only"}
@@ -1225,24 +1279,11 @@ class CodexRPCTests(unittest.TestCase):
             ]
             for result in (None, [], "fixture-only", {}, {"userAgent": []}):
                 cases.append((json.dumps({"id": request_id, "result": result}), "invalid result"))
-            if request_id == 2:
-                for result in ({"rateLimits": None}, {"rateLimits": []},
-                               {"rateLimits": {"primary": []}},
-                               {"rateLimits": {"primary": {"usedPercent": "fixture-only"}}}):
-                    cases.append((json.dumps({"id": 2, "result": result}), "invalid result"))
             for response, reason in cases:
                 with self.subTest(stage=stage, response=response):
                     replies = self.replies({"rateLimits": {}})
                     replies[request_id] = [response]
                     self.assert_failure(replies, f"Codex {stage}: {reason}")
-
-    def test_explicit_no_windows(self):
-        for result in ({"rateLimits": {}}, {"rateLimits": {"primary": None, "secondary": None}},
-                       {"primary": None, "secondary": None}):
-            with self.subTest(result=result), self.server(self.replies(result)):
-                self.assertEqual(quota.collect_codex(), {
-                    "service": "codex", "windows": {},
-                    "error": "Codex rate limits: no quota windows"})
 
     def test_no_windows_diagnostic_survives_collection(self):
         with self.server(self.replies({"rateLimits": {}})), \
