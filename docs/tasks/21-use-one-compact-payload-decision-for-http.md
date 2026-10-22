@@ -107,3 +107,10 @@ Implementation, pinning tests and this record are merged into main before the
 completion move. The retained feature branch and worktree remain available.
 No push, PR or deployment is part of this issue. No owner action is needed;
 there are no agent-owned follow-ups or outstanding acceptance conditions.
+
+Implementation commit `96e0f85` was merged with `git merge --ff-only`.
+Completion commit `264f602` moved the issue to Completed / Accepted. A fresh
+Hai read confirms that state and `accepted: false`; the canonical tracker has
+no uncommitted changes. Final task-link, private-path and whitespace checks
+passed. This record includes the initial failed checks and their passing
+reruns; none remains unresolved.
