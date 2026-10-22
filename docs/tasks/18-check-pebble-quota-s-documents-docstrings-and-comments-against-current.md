@@ -20,3 +20,23 @@ Steward issue, 2026-10-22 04:23 refill. Goal: agentic-leverage (pebble-quota is 
 - Acceptance: the review file is on `main`, every document named in step 1 was read, each change it lists names the code it now matches, and the test results match `main` before the change.
 
 Tracker: [the pebble-quota tracker](../../TASKS.md).
+
+## Execution record
+
+Started on 2026-10-22 from main `ddb5723`; the active-state move was committed
+immediately. Other task files, earlier reviews and the dated architecture
+review remain unchanged. This section records this issue's work as required
+by the launch instructions.
+
+Plan:
+
+1. Read the five in-scope Markdown files and all collector/watchface source
+   comments; trace claims to implementation, configuration and tracker state.
+2. Run the documented unittest command on unchanged main under the memory
+   guard, then correct text and write the dated review with evidence and
+   proposed answers for uncertainties.
+3. Repeat the tests, verify executable content and tests are unchanged, check
+   links and whitespace, merge into main, and complete the tracker unchecked.
+
+Only one heavy command runs at a time. No authenticated provider, device,
+emulator, phone or release run is part of this source review.
