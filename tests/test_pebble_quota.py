@@ -1046,20 +1046,68 @@ class ValidationTests(unittest.TestCase):
             request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/watch",
                                              headers={"Authorization": "Bearer fake"})
             try:
-                for state in ("{secret", "[1]", '{"services": []}',
-                              json.dumps(self.snapshot({"5h": {"used": 1}})),
-                              '{"services": {"claude": {"retry_at": "secret"}}}'):
-                    output.write_text(state)
-                    with mock.patch.object(quota.sys, "stderr", new_callable=io.StringIO) as log:
-                        with self.assertRaises(urllib.error.HTTPError) as error:
-                            urllib.request.urlopen(request, timeout=2)
-                        self.assertEqual(error.exception.code, 503)
-                        self.assertNotIn("secret", error.exception.read().decode())
-                        error.exception.close()
-                        self.assertNotIn("secret", log.getvalue())
-                output.write_text(json.dumps(self.snapshot({"5h": self.WINDOW, "7d": {"used": 1}})))
-                with urllib.request.urlopen(request, timeout=2) as response:
-                    self.assertEqual(len(json.load(response)["q"]), 1)
+                states = [
+                    (None, "Quota unavailable"),
+                    ("{secret", "JSONDecodeError"),
+                    ("[1]", "ValueError"),
+                    ('{"services": []}', "ValueError"),
+                    (json.dumps(self.snapshot({"5h": {"used": 1}})), "ValueError"),
+                    ('{"services": {"claude": {"retry_at": "secret"}}}', "ValueError"),
+                ]
+                for timestamp in (None, True, -1, 1.5, "secret", "2026-10-22",
+                                  float("nan"), float("inf"), quota.WATCH_INT_MAX + 1):
+                    states.append((json.dumps(dict(self.snapshot(), collected_at=timestamp)),
+                                   "ValueError"))
+                states.append((json.dumps({"services": self.snapshot()["services"]}), "ValueError"))
+                fixed_body = None
+                for state, category in states:
+                    with self.subTest(state=state):
+                        if state is not None:
+                            output.write_text(state)
+                        with mock.patch.object(quota.sys, "stderr", new_callable=io.StringIO) as log:
+                            with self.assertRaises(urllib.error.HTTPError) as error:
+                                urllib.request.urlopen(request, timeout=2)
+                            self.assertEqual(error.exception.code, 503)
+                            body = error.exception.read()
+                            error.exception.close()
+                            if fixed_body is None:
+                                fixed_body = body
+                            self.assertEqual(body, fixed_body)
+                            self.assertIn(b"Snapshot unavailable", body)
+                            self.assertNotIn(b"secret", body)
+                            self.assertEqual(log.getvalue(), f"snapshot response failed: {category}\n")
+                expected_rows = [
+                    {"s": "C", "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30},
+                    {"s": "F", "w": "7d", "u": 12, "r": 1000, "d": 100, "p": 38},
+                    {"s": "C", "w": "extra", "u": 20, "r": 1000, "d": 100, "p": 30},
+                    {"s": "X", "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30},
+                    {"s": "X", "w": "7d", "u": 20, "r": 1000, "d": 100, "p": 30},
+                ]
+                valid = self.snapshot({
+                    "5h": self.WINDOW,
+                    "7d (Fable)": dict(self.WINDOW, used_fraction=0.125),
+                    "extra": self.WINDOW,
+                })
+                valid["services"]["codex"] = {"windows": {
+                    "5h": self.WINDOW, "7d": self.WINDOW, "last": self.WINDOW}}
+                valid["temperature_c_tenths"] = 222
+                for timestamp in (0, "1970-01-01T00:00:00.999Z", 42):
+                    for mixed in (False, True):
+                        with self.subTest(timestamp=timestamp, mixed=mixed):
+                            data: dict[str, Any] = json.loads(json.dumps(valid))
+                            data["collected_at"] = timestamp
+                            if mixed:
+                                for service in data["services"].values():
+                                    service["windows"]["bad"] = {"used": 1}
+                            output.write_text(json.dumps(data))
+                            with (mock.patch.object(quota.time, "time", return_value=950),
+                                  urllib.request.urlopen(request, timeout=2) as response):
+                                self.assertEqual(response.status, 200)
+                                self.assertEqual(response.headers["Content-Type"], "application/json")
+                                self.assertEqual(response.headers["Cache-Control"], "no-store")
+                                payload = json.load(response)
+                            self.assertEqual(payload, {"v": 1, "at": 42 if timestamp == 42 else 0,
+                                                       "q": expected_rows, "t": 222})
             finally:
                 server.shutdown()
                 server.server_close()

@@ -531,11 +531,9 @@ def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any
     for service_name in ("claude", "codex"):
         service = data.get("services", {}).get(service_name, {})
         for window_name, item in service.get("windows", {}).items():
-            used = item.get("used_fraction")
-            reset = epoch(item.get("resets_at"))
-            duration = item.get("duration_seconds")
-            if used is None or reset is None or not duration:
-                continue
+            used = item["used_fraction"]
+            reset = item["resets_at"]
+            duration = item["duration_seconds"]
             code, name = service_codes[service_name], window_name
             if service_name == "claude" and window_name == "7d (Fable)":
                 code, name = "F", "7d"
@@ -548,9 +546,8 @@ def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any
                 "p": pace_points(used, reset, duration, now),
             })
     result: dict[str, Any] = {"v": 1, "at": epoch(data.get("collected_at")), "q": rows[:5]}
-    tenths = data.get("temperature_c_tenths")
-    if isinstance(tenths, int):
-        result["t"] = tenths  # outside temperature, integer tenths of degC
+    if "temperature_c_tenths" in data:
+        result["t"] = data["temperature_c_tenths"]  # outside temperature, integer tenths of degC
     return result
 
 
@@ -688,9 +685,10 @@ def make_handler() -> type[BaseHTTPRequestHandler]:
                 return
             try:
                 data = json.loads(self.server.snapshot.read_text())
-                if not has_quota_data(data) or epoch(data.get("collected_at")) is None:
+                payload = compact_watch(data)
+                if not payload["q"] or payload["at"] is None:
                     raise ValueError("Snapshot unavailable")
-                body = json.dumps(compact_watch(data), separators=(",", ":")).encode()
+                body = json.dumps(payload, separators=(",", ":")).encode()
             except Exception as exc:  # noqa: BLE001 - any unreadable snapshot is a 503, not a dropped connection
                 print(f"snapshot response failed: {diagnostic(exc)}",
                       file=sys.stderr, flush=True)
