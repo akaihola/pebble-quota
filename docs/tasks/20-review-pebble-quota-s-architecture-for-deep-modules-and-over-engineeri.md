@@ -115,8 +115,13 @@ includes wrapper monitoring, not admission wait. Command output is excluded.
 The required start move was committed immediately on canonical `main` as
 `368d976`, leaving no uncommitted tracker changes. Plan commit `61ebe07` followed
 on `main`; the retained feature worktree was rebased onto it before review.
-Only the report and this task record are included in the implementation commit.
-Merge and completion evidence will be recorded after the final checks.
+Report commit `7bd1ad9` contains only the report and this task record and was
+merged into canonical `main` with `git merge --ff-only`. Completion commit
+`5639bf4` moves this issue to Completed / Accepted with `[ ]`. A fresh Hai read
+confirms `accepted: false`, the same issue inventory and all 20 other issues
+unchanged; no drafts were filed. The canonical tracker has no uncommitted diff.
+The feature worktree was rebased onto that completion commit before recording
+this final handoff evidence. No push, PR, deployment or service change occurred.
 
 The steward chooses which drafts to file/promote; no message or new thread is
 needed. No owner action is required for this completed review. The branch and
