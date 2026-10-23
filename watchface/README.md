@@ -99,29 +99,23 @@ Open the installed face's **Settings** (gear icon) and configure it as below.
 The [phone script] defaults to:
 
 ```text
-Endpoint: https://gogo.crane-boa.ts.net:8450/v1/watch
-Token:    test-only-token
+Collector URL: https://tinni.crane-boa.ts.net:8450
+Token:         test-only-token
 ```
 
-A phone needs access to that tailnet endpoint and the real service token. Saved
-phone localStorage values override both defaults. Saving nonempty endpoint/token
-values triggers an immediate refresh; a blank field keeps its old value.
-Persistence across reinstalls is not established by localStorage use alone.
+A phone needs access to that tailnet collector and the real service token. Saved
+phone localStorage values override both defaults. The phone fetches
+`<collector URL>/v1/watch`; a saved URL that already ends in `/v1/watch`, as
+versions up to 0.2.0 stored it, works too. Saving triggers an immediate refresh;
+a blank field keeps its old value. Persistence across reinstalls is not
+established by localStorage use alone.
 
-Settings are hosted by the collector: the phone removes a trailing `/v1/watch`
-(with an optional final slash) from the saved endpoint and appends `/config`.
-For the default endpoint, this is:
-
-```text
-https://gogo.crane-boa.ts.net:8450/config
-```
-
-The page requires no bearer authentication. The current phone script adds the
-endpoint and existing service token in URL query parameters for prefill; quota
-fetches use `Authorization: Bearer`. Provider credentials remain on the collector
-host. Token-free configuration transport and an independent recovery page remain
-in the [settings recovery proposal]. An invalid saved endpoint or collector
-outage can prevent Settings from opening; it is not always reachable.
+The settings page ships in the phone script and opens as a `data:` URL, so it
+works while the saved collector is unreachable, for example after the collector
+moves to another host. It fills in the saved collector URL but not the token;
+quota fetches send the token as `Authorization: Bearer`. Provider credentials
+remain on the collector host. HTTPS validation and token rules for a changed
+collector remain in the [settings recovery proposal].
 
 The phone refreshes when ready, every 15 minutes, on a watch sync request, and
 after saving settings. HTTP requests time out after 15 seconds. Failures are
