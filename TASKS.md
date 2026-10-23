@@ -17,13 +17,13 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [25] Bundle the watchface settings page so it opens when the saved endpoint is
-  down
-  <!-- hai:{"id":"simple-fb1302d2-2afc-4abf-a98e-9a70e02deaa7","createdAt":"2026-10-23T19:04:15.185Z","updatedAt":"2026-10-23T19:04:15.185Z"} -->
-
 ## Scheduled
 
 ## In Progress
+
+- [~] [25] Bundle the watchface settings page so it opens when the saved endpoint is
+  down
+      <!-- hai:{"id":"simple-fb1302d2-2afc-4abf-a98e-9a70e02deaa7","createdAt":"2026-10-23T19:04:15.185Z","updatedAt":"2026-10-23T19:04:22.556Z"} -->
 
 ## Completed / Accepted
 
