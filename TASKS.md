@@ -21,11 +21,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [25] Bundle the watchface settings page so it opens when the saved endpoint is
-  down
-      <!-- hai:{"id":"simple-fb1302d2-2afc-4abf-a98e-9a70e02deaa7","createdAt":"2026-10-23T19:04:15.185Z","updatedAt":"2026-10-23T19:04:22.556Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [25] Bundle the watchface settings page so it opens when the saved endpoint is
+  down
+      <!-- hai:{"id":"simple-fb1302d2-2afc-4abf-a98e-9a70e02deaa7","createdAt":"2026-10-23T19:04:15.185Z","updatedAt":"2026-10-27T06:30:01.933Z"} -->
 
 - [ ] [30] Include Claude reset grants in quota snapshots
       <!-- hai:{"id":"simple-d0e422c9-7c3f-4d9a-b566-b0117c922964","createdAt":"2026-10-26T16:49:22.746Z","updatedAt":"2026-10-26T17:13:14.698Z"} -->
