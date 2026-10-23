@@ -17,6 +17,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [25] Bundle the watchface settings page so it opens when the saved endpoint is
+  down
+  <!-- hai:{"id":"simple-fb1302d2-2afc-4abf-a98e-9a70e02deaa7","createdAt":"2026-10-23T19:04:15.185Z","updatedAt":"2026-10-23T19:04:15.185Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -122,7 +126,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,26,27,28,29,30 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -167,6 +171,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [23]: docs/tasks/23-isolate-the-unavailable-snapshot-merge.md
 
 [24]: docs/tasks/24-remove-unused-collector-helper-generality.md
+
+[25]: docs/tasks/25-bundle-the-watchface-settings-page-so-it-opens-when-the-saved-endpoint.md
 
 [26]: docs/tasks/26-reject-zero-byte-watch-strings-before-replacing-rows.md
 
