@@ -47,3 +47,35 @@ PY
 Tracker: [the pebble-quota tracker](../../TASKS.md).
 
 [11]: 11-enforce-the-five-row-collector-phone-and-watch-contract.md
+
+## Implementation plan
+
+1. Confirm the baseline failure and installed SDK encoding before editing.
+2. Reject zero-byte string tuples in the shared string validator and add a
+   regression preserving all five previous rows after a malformed update.
+3. Review the focused diff, merge into main, then record all five original
+   acceptance checks and the standalone reproducer at the merged commit.
+4. Complete this issue without accepting it or issue [11].
+
+## Initial findings
+
+The reproducer on main `ca31f55` returned `accepted, accepted` and only
+`Claude 5h`; its assertion failed as expected.
+
+The installed SDK's `pypkjs.javascript.pebble.Pebble.sendAppMessage` converts
+JavaScript strings to `CString`. Its `libpebble2` AppMessage serializer appends
+one NUL byte to UTF-8 string data. A probe called that installed JavaScript
+bridge with `UNAVAILABLE: ""`, captured the outgoing packet without a watch
+connection, and serialized it: type 1, length 1, data `b'\x00'`.
+The probe passed before changing the decoder. Importing the SDK initially
+needed its installed C++ runtime added to the library search path.
+
+### Initial memory report
+
+- **Baseline reproducer:** started at once; waited 0.00 s; admission
+  10835.7 MiB, final 10833.0 MiB available; starting swap 1056.9 MiB,
+  swap growth 0 MiB; elapsed 0.40 s; exit 1 (expected baseline failure).
+- **Initial file discovery:** an overly broad home file inventory ran before
+  the memory guard was installed; no contemporaneous memory measurements
+  were captured. It completed in 0.45 s with exit 0. Subsequent inventories
+  were restricted to the SDK and repository.
