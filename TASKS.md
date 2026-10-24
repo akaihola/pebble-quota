@@ -33,10 +33,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
       <!-- hai:{"id":"simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106","labels":["steward"],"createdAt":"2026-10-19T12:35:36.920Z","updatedAt":"2026-10-24T06:50:33.611Z"} -->
 
-- [ ] [9] Carry freshness and failure status through to watch rendering
+- [x] [9] Carry freshness and failure status through to watch rendering
     - Depends on: [8]
 
-      <!-- hai:{"id":"simple-f4553c58-87ef-4de4-b8db-1feff4b43833","labels":["steward"],"createdAt":"2026-10-19T12:35:36.286Z","updatedAt":"2026-10-24T06:24:40.690Z"} -->
+      <!-- hai:{"id":"simple-f4553c58-87ef-4de4-b8db-1feff4b43833","labels":["steward"],"createdAt":"2026-10-19T12:35:36.286Z","updatedAt":"2026-10-24T08:01:47.986Z"} -->
 
 - [x] [24] Remove unused collector helper generality
       <!-- hai:{"id":"simple-446bba0e-2d7a-4660-b462-7362295c7112","labels":["steward"],"createdAt":"2026-10-22T05:11:43.566Z","updatedAt":"2026-10-22T07:51:17.588Z"} -->
