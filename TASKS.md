@@ -26,12 +26,12 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [11] Enforce the five-row collector phone and watch contract
+## Completed / Accepted
+
+- [ ] [11] Enforce the five-row collector phone and watch contract
     - Depends on: [8], [9]
 
-      <!-- hai:{"id":"simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106","labels":["steward"],"createdAt":"2026-10-19T12:35:36.920Z","updatedAt":"2026-10-24T06:29:06.014Z"} -->
-
-## Completed / Accepted
+      <!-- hai:{"id":"simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106","labels":["steward"],"createdAt":"2026-10-19T12:35:36.920Z","updatedAt":"2026-10-24T06:50:33.611Z"} -->
 
 - [ ] [9] Carry freshness and failure status through to watch rendering
     - Depends on: [8]

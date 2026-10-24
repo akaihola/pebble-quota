@@ -1,0 +1,100 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [11]",
+      "hai_id": "simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106",
+      "title": "Enforce the five-row collector phone and watch contract",
+      "repository": "/tmp/claude-1001/pq11-evidence",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "277d60036c1f0fe6adc1ba4adcad79a6b3218e74",
+      "delivery_commits": [
+        "031edd5352d3f0e719a942044e2ff48e425e24f6",
+        "c9de5a529f3f205c6a8ad4424a68756827f7000e"
+      ],
+      "checks": [
+        {
+          "id": "contract",
+          "command": "command -v node >/dev/null && command -v cc >/dev/null && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_pebble_quota.CompactSelectionTests tests.test_pebble_quota.PhoneContractTests tests.test_pebble_quota.WatchDecodeTests tests.test_pebble_quota.WatchPipelineTests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "unittest",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "ruff",
+          "command": "ruff check .",
+          "dependencies": {}
+        },
+        {
+          "id": "ty",
+          "command": "ty check",
+          "dependencies": {}
+        },
+        {
+          "id": "watch-build",
+          "command": "make -C watchface clean build",
+          "dependencies": {}
+        }
+      ],
+      "evidence": {
+        "contract": {
+          "repository": "/tmp/claude-1001/pq11-evidence",
+          "tested_commit": "c9de5a529f3f205c6a8ad4424a68756827f7000e",
+          "dependencies": {},
+          "issue": "pebble-quota [11]",
+          "check": "contract",
+          "command": "command -v node >/dev/null && command -v cc >/dev/null && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_pebble_quota.CompactSelectionTests tests.test_pebble_quota.PhoneContractTests tests.test_pebble_quota.WatchDecodeTests tests.test_pebble_quota.WatchPipelineTests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:49:59.690020+00:00"
+        },
+        "unittest": {
+          "repository": "/tmp/claude-1001/pq11-evidence",
+          "tested_commit": "c9de5a529f3f205c6a8ad4424a68756827f7000e",
+          "dependencies": {},
+          "issue": "pebble-quota [11]",
+          "check": "unittest",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:50:13.706439+00:00"
+        },
+        "ruff": {
+          "repository": "/tmp/claude-1001/pq11-evidence",
+          "tested_commit": "c9de5a529f3f205c6a8ad4424a68756827f7000e",
+          "dependencies": {},
+          "issue": "pebble-quota [11]",
+          "check": "ruff",
+          "command": "ruff check .",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:50:13.807251+00:00"
+        },
+        "ty": {
+          "repository": "/tmp/claude-1001/pq11-evidence",
+          "tested_commit": "c9de5a529f3f205c6a8ad4424a68756827f7000e",
+          "dependencies": {},
+          "issue": "pebble-quota [11]",
+          "check": "ty",
+          "command": "ty check",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:50:14.092301+00:00"
+        },
+        "watch-build": {
+          "repository": "/tmp/claude-1001/pq11-evidence",
+          "tested_commit": "c9de5a529f3f205c6a8ad4424a68756827f7000e",
+          "dependencies": {},
+          "issue": "pebble-quota [11]",
+          "check": "watch-build",
+          "command": "make -C watchface clean build",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:50:15.422799+00:00"
+        }
+      }
+    }
+  ]
+}

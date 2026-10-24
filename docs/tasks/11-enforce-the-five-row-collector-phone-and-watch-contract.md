@@ -301,3 +301,27 @@ compiles ran unguarded; each takes seconds.
 [phone harness]: ../../tests/watch/phone.js
 [watch driver]: ../../tests/watch/gauges_main.c
 [the Nix shell]: ../../watchface/shell.nix
+
+### Checks at the merged commit
+
+Fast-forwarded `main` from `277d600` to `c9de5a5`; the delivery commits are
+`031edd5` (plan) and `c9de5a5` (implementation). All five acceptance checks
+were recorded at `c9de5a5` from a clean detached clone, and all passed (see
+[the evidence receipt]):
+
+- `contract`: requires `node` and `cc`, then runs `CompactSelectionTests`,
+  `PhoneContractTests`, `WatchDecodeTests` and `WatchPipelineTests`: 21 tests
+  pass.
+- `unittest`: the full suite, 99 tests pass.
+- `ruff` and `ty`: no findings.
+- `watch-build`: `make -C watchface clean build` finishes successfully.
+
+No lockfile or editable checkout applies, so the checks declare no
+dependencies. The emulator captures above are a manual check and have no
+receipt entry.
+
+The five `check-evidence.py record` calls ran in sequence as one guarded
+command: **started at once**; wait 0 s; admission 10543, final 9655; starting
+swap 870, growth 0; 24 s; exit 0.
+
+[the evidence receipt]: 11-enforce-the-five-row-collector-phone-and-watch-contract.evidence.json
