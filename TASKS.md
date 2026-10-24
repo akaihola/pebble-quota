@@ -23,8 +23,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Completed / Accepted
 
-- [ ] [28] Share one loopback HTTP server helper across pebble-quota's tests
-      <!-- hai:{"id":"simple-0bb6aca7-46a4-4c35-8174-69d3d6348f30","labels":["steward"],"createdAt":"2026-10-24T21:21:39.661Z","updatedAt":"2026-10-24T21:56:10.558Z"} -->
+- [x] [28] Share one loopback HTTP server helper across pebble-quota's tests
+      <!-- hai:{"id":"simple-0bb6aca7-46a4-4c35-8174-69d3d6348f30","labels":["steward"],"createdAt":"2026-10-24T21:21:39.661Z","updatedAt":"2026-10-24T22:07:04.534Z"} -->
 
 - [x] [27] Review pebble-quota's changes since the 10-22 architecture review for
   simplifications that keep behaviour
