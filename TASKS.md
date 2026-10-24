@@ -17,10 +17,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [28] Share one loopback HTTP server helper across pebble-quota's tests
-  <!-- hai:{"id":"simple-0bb6aca7-46a4-4c35-8174-69d3d6348f30","labels":["steward"],"createdAt":"2026-10-24T21:21:39.661Z","updatedAt":"2026-10-24T21:21:39.661Z"} -->
-
 ## Scheduled
+
+- [28] Share one loopback HTTP server helper across pebble-quota's tests
+  <!-- hai:{"id":"simple-0bb6aca7-46a4-4c35-8174-69d3d6348f30","labels":["steward"],"createdAt":"2026-10-24T21:21:39.661Z","updatedAt":"2026-10-24T21:53:33.809Z"} -->
 
 ## In Progress
 
