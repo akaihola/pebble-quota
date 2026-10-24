@@ -30,3 +30,12 @@ Draft D1 of [the simplification review](../reviews/2026-10-25-simplification-rev
 All named tests keep their assertions and pass without skips; the four lifecycle copies become one; every `view` caller stays valid; the server still shuts down, closes and joins within its existing teardown; net test source is smaller. No deployment, device check or real provider request. Handoff: a short outcome; details stay in this file.
 
 [27]: 27-review-pebble-quota-s-changes-since-the-10-22-architecture-review-for-.md
+
+## Implementation plan
+
+Use one context manager for the four server lifetimes, with shutdown, close
+and thread join in its `finally`. Nest the HTTP contexts inside temporary
+directories; register the pipeline context after its mocks so LIFO cleanup
+stops the server first. Remove the unused `watch_now` argument. Preserve all
+assertions, provider guards, socket-only tests and tool fixtures. Run the named
+checks, the full offline suite, Ruff and ty, then review cleanup on failure.
