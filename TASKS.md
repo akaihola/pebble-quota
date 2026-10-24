@@ -4,11 +4,6 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Unverified proposals
 
-- [14] Prevent older phone responses from overwriting newer settings or data
-    - Depends on: [7]
-
-  <!-- hai:{"id":"simple-07285625-bd27-4eb2-8747-624e02681c4a","labels":["steward"],"createdAt":"2026-10-19T12:35:47.291Z","updatedAt":"2026-10-19T12:35:47.291Z"} -->
-
 - [12] Document recoverable operation and reconcile build release assumptions
     - Depends on: [6], [7], [8], [9], [10], [11], [13], [14]
 
@@ -21,6 +16,9 @@ Rules for TASKS.md usage are at the bottom of the file.
   <!-- hai:{"id":"simple-f5d94773-9467-431d-b527-2947873cdf46","labels":["steward"],"createdAt":"2026-10-19T12:35:35.429Z","updatedAt":"2026-10-19T12:35:35.429Z"} -->
 
 ## Ordered backlog
+
+- [14] Prevent older phone responses from overwriting newer settings or data
+  <!-- hai:{"id":"simple-07285625-bd27-4eb2-8747-624e02681c4a","labels":["steward"],"createdAt":"2026-10-19T12:35:47.291Z","updatedAt":"2026-10-24T09:53:17.407Z"} -->
 
 ## Scheduled
 
