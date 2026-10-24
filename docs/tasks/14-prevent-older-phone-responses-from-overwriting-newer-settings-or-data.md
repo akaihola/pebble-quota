@@ -48,3 +48,19 @@ Promoted from Unverified proposals (steward D13, D95; goal
   `3bbc2c9` and passes after the change; all of `PhoneContractTests` and the
   existing unit tests, ruff and ty pass; the check receipt records them at the
   merged commit.
+
+## Implementation plan
+
+1. Give every refresh a sequence number; discard superseded callbacks even if
+   the newer request fails. Snapshot endpoint/token and reset the timestamp
+   watermark when either changes.
+2. Reject decreasing collector timestamps for one refresh interval after the
+   last forwarded response. Rejected responses do not extend that interval.
+   Expiry or an invalid/backward phone clock allows recovery; malformed wire
+   timestamps still fail validation. Equal timestamps remain deliverable.
+3. Keep AppMessage failure deferred until the next ordinary refresh. Add an
+   explicit failure log, with no retry timer or retained message queue.
+4. Extend the existing Node VM fixture with delayed request completions,
+   settings, clock and delivery outcomes. Test ordering, failures, recovery and
+   bounded delivery; run the existing suite, Ruff and ty. Verify regressions
+   against the audited baseline, then record checks at the merged commit.
