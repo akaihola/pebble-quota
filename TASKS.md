@@ -28,8 +28,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Completed / Accepted
 
-- [ ] [26] Reject zero-byte watch strings before replacing rows
-      <!-- hai:{"id":"simple-1446533a-f439-4760-b6ea-340b8b48b273","labels":["steward"],"createdAt":"2026-10-24T08:02:54.573Z","updatedAt":"2026-10-24T08:49:23.506Z"} -->
+- [x] [26] Reject zero-byte watch strings before replacing rows
+      <!-- hai:{"id":"simple-1446533a-f439-4760-b6ea-340b8b48b273","labels":["steward"],"createdAt":"2026-10-24T08:02:54.573Z","updatedAt":"2026-10-24T09:14:43.294Z"} -->
 
 - [ ] [11] Enforce the five-row collector phone and watch contract
     - Depends on: [8], [9]
