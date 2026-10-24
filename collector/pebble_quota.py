@@ -98,12 +98,30 @@ def diagnostic(error: Exception) -> str:
     return name if name in DIAGNOSTICS else "Quota unavailable"
 
 
-def normalize_window(name: str, label: Any, item: Any) -> dict[str, Any] | None:
-    if not isinstance(label, str) or not isinstance(item, dict):
+# Watch wire codes. Snapshot labels keep a scope's display name, e.g.
+# "7d (Fable)"; the wire carries only the one-letter code and the window.
+SERVICE_CODES = {"claude": "C", "codex": "X"}
+CLAUDE_SCOPED_CODES = {"Fable": "F"}
+# Gauge lines the watch has room for: rows plus one per unavailable provider.
+WATCH_LINES = 5
+
+
+def wire_identity(name: str, label: str) -> tuple[str, str] | None:
+    """Bounded (code, window) for a snapshot window label, or None if unsupported."""
+    code, window = SERVICE_CODES[name], label
+    if name == "claude" and "(" in label:
+        window, separator, scope = label.partition(" (")
+        code = CLAUDE_SCOPED_CODES.get(scope[:-1]) if separator and scope.endswith(")") else None
+        if code is None:
+            return None
+    if not (1 <= len(window) <= 7 and window.isascii()
+            and all(32 <= ord(c) <= 126 for c in window)):
         return None
-    watch_label = "7d" if name == "claude" and label == "7d (Fable)" else label
-    if not (1 <= len(watch_label) <= 7 and watch_label.isascii()
-            and all(32 <= ord(c) <= 126 for c in watch_label)):
+    return code, window
+
+
+def normalize_window(name: str, label: Any, item: Any) -> dict[str, Any] | None:
+    if not isinstance(label, str) or not isinstance(item, dict) or not wire_identity(name, label):
         return None
     used, duration = item.get("used_fraction"), item.get("duration_seconds")
     reset = epoch(item.get("resets_at"))
@@ -178,8 +196,8 @@ def pace_points(used_fraction: float, resets_at: int, duration_seconds: int, now
     return round((elapsed_fraction - used_fraction) * 100)
 
 
-# Unscoped limits[] kinds and their windows. Only Fable's weekly_scoped entry
-# is supported; its full label lets compact_watch assign the F service code.
+# Unscoped limits[] kinds and their windows. weekly_scoped entries are kept only
+# for model scopes in CLAUDE_SCOPED_CODES, labelled "7d (<display name>)".
 CLAUDE_LIMIT_WINDOWS = {
     "session": ("5h", 18_000),
     "weekly_all": ("7d", 604_800),
@@ -188,7 +206,7 @@ CLAUDE_SCOPED_DURATION = 604_800
 
 
 def claude_windows_from_limits(limits: Any) -> dict[str, Any]:
-    """Validated limits[] windows: 5h, 7d and optional 7d (Fable).
+    """Validated limits[] windows: 5h, 7d and supported scopes such as 7d (Fable).
 
     Unsupported kinds/scopes and invalid percentages, resets or windows are skipped.
     """
@@ -211,13 +229,10 @@ def claude_windows_from_limits(limits: Any) -> dict[str, Any]:
             scope = limit.get("scope")
             if not isinstance(scope, dict) or not isinstance(scope.get("model"), dict):
                 continue
-            scope = scope["model"]
-            if scope.get("display_name") != "Fable":
+            display_name = scope["model"].get("display_name")
+            if not isinstance(display_name, str) or display_name not in CLAUDE_SCOPED_CODES:
                 continue
-            name, seconds = (
-                f"7d ({scope.get('display_name') or 'model'})",
-                CLAUDE_SCOPED_DURATION,
-            )
+            name, seconds = f"7d ({display_name})", CLAUDE_SCOPED_DURATION
         else:
             continue
         window = normalize_window("claude", name, {
@@ -530,24 +545,23 @@ def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any
     data = normalize_snapshot(data)
     now = int(time.time()) if now is None else now
     at = epoch(data.get("collected_at"))
-    rows = []
+    ranked = []
     unavailable = ""
-    service_codes = {"claude": "C", "codex": "X"}
-    for service_name in ("claude", "codex"):
+    for provider, (service_name, service_code) in enumerate(SERVICE_CODES.items()):
         service = data.get("services", {}).get(service_name, {})
         if not service.get("windows"):
-            unavailable += service_codes[service_name]
+            unavailable += service_code
         # Retained rows keep their own reading time; the pass time is only a fallback.
         observed = epoch(service.get("last_success_at"))
         observed = at if observed is None else observed
         failed = service.get("stale") is True or "error" in service
-        for window_name, item in service.get("windows", {}).items():
+        for label, item in service.get("windows", {}).items():
             used = item["used_fraction"]
             reset = item["resets_at"]
             duration = item["duration_seconds"]
-            code, name = service_codes[service_name], window_name
-            if service_name == "claude" and window_name == "7d (Fable)":
-                code, name = "F", "7d"
+            identity = wire_identity(service_name, label)
+            assert identity is not None  # normalize_snapshot keeps only valid labels
+            code, name = identity
             row = {
                 "s": code,
                 "w": name,
@@ -560,8 +574,13 @@ def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any
                 row["o"] = observed
             if failed:
                 row["e"] = 1
-            rows.append(row)
-    result: dict[str, Any] = {"v": 1, "at": at, "q": rows[:5]}
+            # Priority: core (unscoped) before scoped, provider, shorter window, code, label.
+            ranked.append(((code != service_code, provider, duration, code, name), row))
+    # Each provider in n takes one of the watch's lines; rows fill the rest by
+    # priority and go out in display order, each provider's rows together.
+    chosen = sorted(ranked, key=lambda item: item[0])[:WATCH_LINES - len(unavailable)]
+    chosen.sort(key=lambda item: (item[0][1], item[0][0], *item[0][2:]))
+    result: dict[str, Any] = {"v": 1, "at": at, "q": [row for _, row in chosen]}
     if unavailable:
         result["n"] = unavailable  # providers without rows, e.g. after a failed Codex read
     if "temperature_c_tenths" in data:

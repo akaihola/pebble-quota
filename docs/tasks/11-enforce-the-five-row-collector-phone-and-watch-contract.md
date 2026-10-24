@@ -157,3 +157,147 @@ five-row rule and [the watchface guide] the pairing and rejection behaviour.
 [The collector reference]: ../collector.md
 [The README]: ../../README.md
 [the watchface guide]: ../../watchface/README.md
+
+## Implementation and verification
+
+Implemented on 2026-10-24 as planned. No wire field or version changed. No
+collector restart, deployment, phone install or on-device check was done.
+
+- **Collector** ([collector]): `CLAUDE_SCOPED_CODES` maps supported scope
+  display names to wire codes (`Fable` → `F`), and `wire_identity()` turns a
+  snapshot label into a bounded `(code, window)`. `normalize_window()` uses it,
+  so a Claude label with an unknown parenthesised scope is invalid instead of
+  passing as a core `C` row. `compact_watch()` ranks rows (core before scoped,
+  provider, duration, code, label), keeps `5 - len(n)` of them and sends them in
+  display order. The snapshot keeps its `7d (Fable)` label.
+- **Phone** ([phone script]): `quotaMessage()` checks the whole payload and
+  throws on the first problem; `refresh()` logs `Rejected quota data:` with
+  the reason and sends nothing. It no longer slices.
+- **Watch:** [the gauge module] gains `decode_message()`, which fills a
+  `QuotaMessage` from one typed field per message key and returns false on any
+  missing, mistyped, wrong-length or out-of-range value. [The watch app] reads
+  the tuples into those fields, decodes into static scratch space and assigns
+  the shown message only on success. Claude and Fable pair only with equal
+  reset and duration, and a message with no rows still shows its unavailable
+  providers. `MAX_GAUGES` is now five, because the decoder rejects more rows
+  plus unavailable providers than that.
+- **Docs:** [the collector reference] gains the five-line rule, wire identity,
+  the phone and watch checks, the 437-byte message size and the compatibility
+  note; [the README] states the rule; [the watchface guide] covers pairing and
+  rejection.
+
+[The tests] gain 13 tests (86 → 99):
+
+- `CompactSelectionTests` (Python): 0, 1 and 5 rows in the same order whatever
+  the snapshot's mapping order; seven windows with two extra scoped models
+  patched into the table, with and without Codex; unknown, long and malformed
+  scope labels in the adapter and the snapshot, and a long supported display
+  name that reaches the wire only as its code.
+- `PhoneContractTests` (Node through [phone harness], which now also returns
+  the log): valid 0, 1 and 5 rows; 65 rejected responses (versions missing, 0,
+  2 and `"1"`; bad `at`, `n`, `t` and `q`; 6 rows; rows plus `n` over five;
+  each required row field missing; wrong types, non-integers, out-of-range
+  values, long, empty and non-ASCII strings; unparsable JSON), each sending
+  nothing and logging one reason. The keys the phone sends plus
+  `REQUEST_SYNC` equal `package.json`'s list, as do the `MESSAGE_KEY_` names in
+  the watch app. The largest valid message is 437 bytes by Pebble's dictionary
+  layout, within the 2,048-byte inbox.
+- `WatchDecodeTests` (host C through [watch driver], which now reads typed
+  tuples on stdin): 43 malformed second messages (missing keys, wrong tuple
+  types, 8-byte integers, unterminated strings, out-of-range values, too many
+  lines) each rejected while the earlier five rows stay as they were; 1-, 2- and
+  4-byte signed and unsigned integers and an absent temperature accepted; a
+  valid one-row message replacing five rows with no leftovers; pairing only for
+  equal reset and duration; five lines including an unavailable provider and
+  an unknown code, and 0 rows with and without `n`.
+- `WatchPipelineTests`: five unpaired rows end to end when Fable resets apart,
+  and extra scoped models through the Claude adapter leaving the healthy
+  display unchanged, then taking the line left by a failed Codex.
+
+One existing expectation changed: the sanitisation test served six valid rows,
+five of them core, and expected the old mapping-order slice to keep Fable. The
+new policy keeps the five core rows.
+
+### Checks before the merge
+
+- `python3 -m unittest discover -s tests -v`: 99 tests pass, none skipped
+  (86 existing, one with a changed expectation, and 13 new).
+- `ruff check .` and `ty check`: no findings.
+- `make clean build` in `watchface`: the bundle builds with SDK 4.17. The
+  compiler still warns that the temperature `snprintf` may truncate; only its
+  variable name changed. The linker's RWX segment notice comes from the SDK.
+- `git diff --check`: clean.
+
+### Emery emulator captures
+
+The emulator ran headless under `xvfb-run` inside [the Nix shell], against a
+temporary copy of the bundle whose only change pointed the phone script's
+default endpoint and token at a loopback server. That server served
+synthetic snapshots through the collector's `Handler` (one scene served a raw
+body instead), with no refresher and no provider access. Timestamps were
+relative to the capture time, and each scene reinstalled the app.
+
+- **Five unpaired rows** (Fable resetting an hour after Claude weekly): five
+  lines, `Claude 5h` green at 20% with `updated 0m ago`, `Claude 7d` green at
+  40%, `Fable 7d` red at 70%, `Codex 5h` yellow at 45% and `Codex 7d` green
+  at 10%, each with its own marker; 22° and the calendar above. At 18 pixels a
+  line the bars shrink to 4 pixels and the titles sit tight above them, but
+  nothing overlaps or clips.
+- **Stale status** (same rows, Claude kept 40 minutes after a 429): the three
+  Claude lines show dark-gray used bars and `stale 40m`; both Codex lines keep
+  their pace colours. The temperature stays, because the pass is current.
+- **Unsupported version** (the same payload with `v: 2`): the face shows
+  `Waiting for quota data`, and the emulator log shows `Rejected quota data:
+  unsupported version 2` from the phone script.
+- **Paired** (equal resets): four lines with `Claude+Fable 7d` as two bars
+  under one marker, as before.
+
+The log showed `Quota data sent` for the valid scenes and no watch-side
+`Rejected malformed quota message`, so the emulator's own AppMessage encoding
+(32-bit integers, terminated strings) passes the decoder.
+
+Not verified: a physical watch or phone, and the deployed collector. Both
+belong to the owner's install and the steward's restart.
+
+### Remaining gaps for the steward
+
+- An unsupported version or malformed payload looks on the watch like a phone
+  that stopped delivering: the old rows age to stale. Only the phone log names
+  the cause. A visible rejection state would need a new message key.
+- Old bundles still pair Claude and Fable by identity alone until the new
+  bundle is installed.
+
+### Guarded command resource record
+
+Memory readings are in MiB. Each guarded command ran alone through a wrapper
+that waited for 2,048 MiB available (10-minute limit, 1,536 MiB fallback). It
+stopped the command below 1,024 MiB available or after 512 MiB of swap growth.
+
+- `make -C watchface clean build`, first attempt: **started at once**; wait
+  0 s; admission 9698, final 9711; starting swap 846, growth 0; 1 s; exit 2.
+  The sandbox kept the Pebble tool from writing its settings file; the rerun
+  outside the sandbox followed.
+- `make -C watchface clean build`: **started at once**; wait 0 s; admission
+  9700, final 10582; starting swap 846, growth 0; 2 s; exit 0.
+- `make build` of the temporary capture bundle: **started at once**; wait 0 s;
+  admission 9749, final 9663; starting swap 846, growth 0; 1 s; exit 0.
+- Emulator captures (`nix-shell watchface/shell.nix --run 'xvfb-run -a
+  python3 <capture script>'`): **started at once**; wait 0 s; admission 9834,
+  final 10350; starting swap 846, growth 24; 48 s; exit 0.
+- Full suite, final run (`python3 -m unittest discover -s tests -v`):
+  **started at once**; wait 0 s; admission 10605, final 10571; starting swap
+  870, growth 0; 15 s; exit 0.
+
+Two development runs of the full suite (about 11 and 14 seconds) ran without
+the wrapper, with 10,349 and 9,943 MiB available at the last readings before
+them; their swap was not measured. Ruff, ty, focused test runs and host
+compiles ran unguarded; each takes seconds.
+
+[collector]: ../../collector/pebble_quota.py
+[phone script]: ../../watchface/src/pkjs/index.js
+[the gauge module]: ../../watchface/src/c/gauges.c
+[The watch app]: ../../watchface/src/c/watchface.c
+[The tests]: ../../tests/test_pebble_quota.py
+[phone harness]: ../../tests/watch/phone.js
+[watch driver]: ../../tests/watch/gauges_main.c
+[the Nix shell]: ../../watchface/shell.nix

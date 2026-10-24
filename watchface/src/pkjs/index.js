@@ -8,27 +8,61 @@ function setting(name, fallback) {
   return localStorage.getItem(name) || fallback;
 }
 
-function sendQuota(data) {
-  var rows = (data.q || []).slice(0, 5);
-  var at = data.at || 0;
+// Wire limits shared with the collector and the watch; see docs/collector.md.
+var WIRE_VERSION = 1;
+var MAX_LINES = 5;  // rows plus one line per unavailable provider
+var INT_MAX = 2147483647;
+var MAX_DURATION = 21474836;  // keeps the watch's duration * 100 within int32
+
+function isInt(value, low, high) {
+  return typeof value === "number" && Math.floor(value) === value && value >= low && value <= high;
+}
+
+function isText(value, pattern) {
+  return typeof value === "string" && pattern.test(value);
+}
+
+// Checks the whole payload before building its AppMessage and throws on the
+// first problem, so a bad payload changes nothing on the watch.
+function quotaMessage(data) {
+  if (!data || data.v !== WIRE_VERSION) {
+    throw new Error("unsupported version " + JSON.stringify(data && data.v));
+  }
+  // Providers without rows; an older collector omits it.
+  var unavailable = data.n === undefined ? "" : data.n;
+  if (!isInt(data.at, 0, INT_MAX)) throw new Error("invalid at");
+  if (!isText(unavailable, /^[A-Z]{0,3}$/)) throw new Error("invalid n");
+  if (data.t !== undefined && !isInt(data.t, -INT_MAX, INT_MAX)) throw new Error("invalid t");
+  if (!Array.isArray(data.q) || data.q.length + unavailable.length > MAX_LINES) {
+    throw new Error("invalid q");
+  }
   var message = {
-    COLLECTED_AT: at,
-    ROW_COUNT: rows.length,
-    // Providers without rows; an older collector omits it.
-    UNAVAILABLE: typeof data.n === "string" ? data.n : "",
+    COLLECTED_AT: data.at,
+    ROW_COUNT: data.q.length,
+    UNAVAILABLE: unavailable,
   };
   // Outside temperature in tenths of degC; only sent when the collector had it.
-  if (typeof data.t === "number") message["TEMP"] = data.t;
-  rows.forEach(function (row, index) {
+  if (data.t !== undefined) message["TEMP"] = data.t;
+  data.q.forEach(function (row, index) {
+    if (!row || !isText(row.s, /^[A-Z]$/) || !isText(row.w, /^[ -~]{1,7}$/)
+        || !isInt(row.u, 0, 100) || !isInt(row.r, 0, INT_MAX) || !isInt(row.d, 1, MAX_DURATION)
+        || !(row.o === undefined || isInt(row.o, 0, INT_MAX))
+        || !(row.e === undefined || isInt(row.e, 0, 1))) {
+      throw new Error("invalid row " + index);
+    }
     message["S" + index] = row.s;
     message["W" + index] = row.w;
     message["U" + index] = row.u;
     message["R" + index] = row.r;
     message["D" + index] = row.d;
     // Each row's own reading time; an older collector sends only the pass time.
-    message["O" + index] = typeof row.o === "number" ? row.o : at;
-    message["E" + index] = row.e ? 1 : 0;
+    message["O" + index] = row.o === undefined ? data.at : row.o;
+    message["E" + index] = row.e || 0;
   });
+  return message;
+}
+
+function sendQuota(message) {
   var onSent = function () {
     console.log("Quota data sent");
   };
@@ -45,11 +79,14 @@ function refresh() {
   request.timeout = 15000;
   request.onload = function () {
     if (request.status >= 200 && request.status < 300) {
+      var message;
       try {
-        sendQuota(JSON.parse(request.responseText));
+        message = quotaMessage(JSON.parse(request.responseText));
       } catch (error) {
-        console.log("Invalid quota JSON: " + error);
+        console.log("Rejected quota data: " + error.message);
+        return;
       }
+      sendQuota(message);
     } else {
       console.log("Quota HTTP status " + request.status);
     }

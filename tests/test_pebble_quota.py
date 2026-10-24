@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -1162,12 +1163,13 @@ class ValidationTests(unittest.TestCase):
                             self.assertIn(b"Snapshot unavailable", body)
                             self.assertNotIn(b"secret", body)
                             self.assertEqual(log.getvalue(), f"snapshot response failed: {category}\n")
+                # Six valid rows: the five core rows outrank the scoped Fable row.
                 expected_rows = [
                     {"s": "C", "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30},
-                    {"s": "F", "w": "7d", "u": 12, "r": 1000, "d": 100, "p": 38},
                     {"s": "C", "w": "extra", "u": 20, "r": 1000, "d": 100, "p": 30},
                     {"s": "X", "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30},
                     {"s": "X", "w": "7d", "u": 20, "r": 1000, "d": 100, "p": 30},
+                    {"s": "X", "w": "last", "u": 20, "r": 1000, "d": 100, "p": 30},
                 ]
                 valid = self.snapshot({
                     "5h": self.WINDOW,
@@ -1473,18 +1475,11 @@ class WatchView(NamedTuple):
     gauges: list[tuple]
 
 
-class WatchPipelineTests(unittest.TestCase):
-    """Fake providers -> snapshot -> /v1/watch -> phone script (Node) -> watch rules (host C)."""
+class WatchTools(unittest.TestCase):
+    """The phone script under Node and the watch's message and gauge rules built on the host."""
 
-    T0 = 1_800_000_000
     WATCHFACE = Path(__file__).parents[1] / "watchface"
     HARNESS = Path(__file__).parent / "watch"
-    HEALTHY: ClassVar[list[tuple]] = [
-        ("Claude 5h", "updated 0m ago", "green", "-", 1, 20),
-        ("Claude+Fable 7d", "", "green", "red", 1, 50),
-        ("Codex 5h", "", "yellow", "-", 1, 40),
-        ("Codex 7d", "", "green", "-", 1, 10),
-    ]
     node: ClassVar[str]
     driver: ClassVar[Path]
 
@@ -1502,6 +1497,52 @@ class WatchPipelineTests(unittest.TestCase):
                             "-o", str(cls.driver)], check=True, capture_output=True,
                            env={"PATH": _TOOL_PATH})
 
+    def phone_run(self, response: dict[str, Any]) -> dict[str, list]:
+        """Sent AppMessages and log lines of one phone refresh."""
+        with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
+            result = subprocess.run(
+                [self.node, str(self.HARNESS / "phone.js"), str(self.WATCHFACE / "src/pkjs/index.js")],
+                input=json.dumps(response), capture_output=True, text=True, check=True,
+                env={"PATH": _TOOL_PATH})
+        return json.loads(result.stdout)
+
+    def phone(self, response: dict[str, Any]) -> list[dict[str, Any]]:
+        return self.phone_run(response)["sent"]
+
+    def decode(self, messages: list[list[tuple]], now: int) -> tuple[list[str], str, list[tuple]]:
+        """Feed (key, tuple type, value) messages to the watch rules; see gauges_main.c."""
+        stdin = "\n\n".join("\n".join(f"{key}\t{kind}\t{value}" for key, kind, value in message)
+                            for message in messages) + "\n"
+        with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
+            result = subprocess.run([str(self.driver), str(now)], input=stdin, capture_output=True,
+                                    text=True, check=True, env={})
+        lines = result.stdout.splitlines()
+        verdicts, temperature = lines[:len(messages)], lines[len(messages)]
+        gauges = []
+        for line in lines[len(messages) + 1:]:
+            title, status, first, second, marker, elapsed = line.split("\t")
+            gauges.append((title, status, first, second, int(marker), int(elapsed)))
+        return verdicts, temperature, gauges
+
+    def watch(self, message: dict[str, Any], now: int) -> tuple[str, list[tuple]]:
+        """Decode one phone message, typed as PebbleKit JS sends it, and plan the gauges."""
+        tuples = [(key, "s" if isinstance(value, str) else "i4", value) for key, value in message.items()]
+        verdicts, temperature, gauges = self.decode([tuples], now)
+        self.assertEqual(verdicts, ["accepted"])
+        return temperature, gauges
+
+
+class WatchPipelineTests(WatchTools):
+    """Fake providers -> snapshot -> /v1/watch -> phone script (Node) -> watch rules (host C)."""
+
+    T0 = 1_800_000_000
+    HEALTHY: ClassVar[list[tuple]] = [
+        ("Claude 5h", "updated 0m ago", "green", "-", 1, 20),
+        ("Claude+Fable 7d", "", "green", "red", 1, 50),
+        ("Codex 5h", "", "yellow", "-", 1, 40),
+        ("Codex 7d", "", "green", "-", 1, 10),
+    ]
+
     def setUp(self) -> None:
         home = Path(self.enterContext(tempfile.TemporaryDirectory()))
         credentials = home / ".claude/.credentials.json"
@@ -1511,6 +1552,8 @@ class WatchPipelineTests(unittest.TestCase):
         self.output = home / "latest.json"
         self.now = self.T0
         self.session_percent, self.session_reset = 20, self.T0 + 14_400
+        self.fable_reset = self.T0 + 302_400
+        self.extra_limits: list[dict[str, Any]] = []
         self.claude_error: Exception | None = None
         self.codex_error: Exception | None = None
         self.temperature: int | None = 215
@@ -1537,8 +1580,9 @@ class WatchPipelineTests(unittest.TestCase):
             {"kind": "session", "percent": self.session_percent,
              "resets_at": quota.iso_from_epoch(self.session_reset), "scope": None},
             {"kind": "weekly_all", "percent": 40, "resets_at": weekly_reset, "scope": None},
-            {"kind": "weekly_scoped", "percent": 70, "resets_at": weekly_reset,
+            {"kind": "weekly_scoped", "percent": 70, "resets_at": quota.iso_from_epoch(self.fable_reset),
              "scope": {"model": {"display_name": "Fable"}}},
+            *self.extra_limits,
         ]})
 
     def codex(self) -> dict[str, Any]:
@@ -1568,29 +1612,6 @@ class WatchPipelineTests(unittest.TestCase):
             except urllib.error.HTTPError as error:
                 error.close()
                 return {"status": error.code, "body": ""}
-
-    def phone(self, response: dict[str, Any]) -> list[dict[str, Any]]:
-        with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
-            result = subprocess.run(
-                [self.node, str(self.HARNESS / "phone.js"), str(self.WATCHFACE / "src/pkjs/index.js")],
-                input=json.dumps(response), capture_output=True, text=True, check=True,
-                env={"PATH": _TOOL_PATH})
-        return json.loads(result.stdout)
-
-    def watch(self, message: dict[str, Any], now: int) -> tuple[str, list[tuple]]:
-        args = [str(now), str(message["COLLECTED_AT"]), "1" if "TEMP" in message else "0",
-                message["UNAVAILABLE"]]
-        for index in range(message["ROW_COUNT"]):
-            args += [str(message[f"{key}{index}"]) for key in "SWURDOE"]
-        with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
-            result = subprocess.run([str(self.driver), *args], capture_output=True, text=True,
-                                    check=True, env={})
-        temperature, *lines = result.stdout.splitlines()
-        gauges = []
-        for line in lines:
-            title, status, first, second, marker, elapsed = line.split("\t")
-            gauges.append((title, status, first, second, int(marker), int(elapsed)))
-        return temperature, gauges
 
     def view(self, watch_now: int | None = None) -> WatchView:
         response = self.fetch()
@@ -1767,3 +1788,251 @@ class WatchPipelineTests(unittest.TestCase):
                 gauges = self.watch(view.message, now)[1]
                 self.assertEqual((gauges[0][2], gauges[0][5]), claude)
                 self.assertEqual((gauges[2][2], gauges[2][5]), codex)
+
+    def test_five_unpaired_rows_when_fable_resets_apart(self):
+        self.fable_reset = self.T0 + 306_000
+        self.refresh()
+        view = self.view()
+        self.assertEqual([(row["s"], row["w"]) for row in view.payload["q"]],
+                         [("C", "5h"), ("C", "7d"), ("F", "7d"), ("X", "5h"), ("X", "7d")])
+        self.assertEqual(view.gauges, [
+            ("Claude 5h", "updated 0m ago", "green", "-", 1, 20),
+            ("Claude 7d", "", "green", "-", 1, 50),
+            ("Fable 7d", "", "red", "-", 1, 50),
+            ("Codex 5h", "", "yellow", "-", 1, 40),
+            ("Codex 7d", "", "green", "-", 1, 10),
+        ])
+
+    def test_extra_scoped_models_never_displace_core_rows(self):
+        self.enterContext(mock.patch.dict(quota.CLAUDE_SCOPED_CODES, {"Opus": "O", "Haiku": "H"}))
+        weekly_reset = quota.iso_from_epoch(self.T0 + 302_400)
+        self.extra_limits = [{"kind": "weekly_scoped", "percent": 5, "resets_at": weekly_reset,
+                              "scope": {"model": {"display_name": name}}} for name in ("Opus", "Haiku")]
+        self.refresh()
+        view = self.view()
+        self.assertEqual(len(json.loads(self.output.read_text())["services"]["claude"]["windows"]), 5)
+        self.assertEqual(view.gauges, self.HEALTHY)
+        # Without Codex rows its unavailable line takes one of the five.
+        self.now = self.T0 + 300
+        self.codex_error = quota.CodexError("Codex rate limits: response timeout")
+        self.refresh()
+        view = self.view()
+        self.assertEqual([(row["s"], row["w"]) for row in view.payload["q"]],
+                         [("C", "5h"), ("C", "7d"), ("F", "7d"), ("H", "7d")])
+        self.assertEqual([gauge[:2] for gauge in view.gauges], [
+            ("Claude 5h", "updated 0m ago"), ("Claude+Fable 7d", ""), ("H 7d", ""), ("Codex", "unavailable")])
+
+
+class CompactSelectionTests(unittest.TestCase):
+    """Five gauge lines: each provider in n takes one, core windows come before scoped extras."""
+
+    @staticmethod
+    def window(duration: int = 604_800) -> dict[str, Any]:
+        return {"used_fraction": 0.2, "resets_at": 1_000_000, "duration_seconds": duration}
+
+    @staticmethod
+    def compact(claude: dict | None = None, codex: dict | None = None) -> dict[str, Any]:
+        services = {name: {"windows": windows}
+                    for name, windows in (("claude", claude), ("codex", codex)) if windows is not None}
+        return quota.compact_watch({"collected_at": 0, "services": services}, now=0)
+
+    @staticmethod
+    def identities(payload: dict[str, Any]) -> list[tuple[str, str]]:
+        return [(row["s"], row["w"]) for row in payload["q"]]
+
+    def test_zero_one_and_five_rows_in_a_stable_order(self):
+        payload = self.compact()
+        self.assertEqual((payload["q"], payload["n"]), ([], "CX"))
+        payload = self.compact(codex={"5h": self.window(18_000)})
+        self.assertEqual((self.identities(payload), payload["n"]), ([("X", "5h")], "C"))
+        claude = {"7d (Fable)": self.window(), "7d": self.window(), "5h": self.window(18_000)}
+        codex = {"7d": self.window(), "5h": self.window(18_000)}
+        for claude_windows, codex_windows in ((claude, codex),
+                                              (dict(reversed(claude.items())), dict(reversed(codex.items())))):
+            payload = self.compact(claude_windows, codex_windows)
+            self.assertEqual(self.identities(payload),
+                             [("C", "5h"), ("C", "7d"), ("F", "7d"), ("X", "5h"), ("X", "7d")])
+            self.assertNotIn("n", payload)
+
+    def test_extra_scoped_models_fill_only_the_lines_left(self):
+        claude = {"5h": self.window(18_000), "7d": self.window(), "7d (Opus)": self.window(),
+                  "7d (Haiku)": self.window(), "7d (Fable)": self.window()}
+        codex = {"5h": self.window(18_000), "7d": self.window()}
+        with mock.patch.dict(quota.CLAUDE_SCOPED_CODES, {"Opus": "O", "Haiku": "H"}):
+            payload = self.compact(claude, codex)
+            self.assertEqual(self.identities(payload),
+                             [("C", "5h"), ("C", "7d"), ("F", "7d"), ("X", "5h"), ("X", "7d")])
+            payload = self.compact(claude)
+            self.assertEqual(self.identities(payload),
+                             [("C", "5h"), ("C", "7d"), ("F", "7d"), ("H", "7d")])
+            self.assertEqual(payload["n"], "X")
+
+    def test_scope_display_names_never_reach_the_wire(self):
+        long_name = "Fable Extended Thinking Preview"
+        limits = [{"kind": "weekly_scoped", "percent": 5, "resets_at": 1_000_000,
+                   "scope": {"model": {"display_name": name}}} for name in (long_name, "Op")]
+        # Unknown scopes are skipped by the adapter and invalid in a snapshot, however short.
+        self.assertEqual(quota.claude_windows_from_limits(limits), {})
+        for label in ("7d (Op)", f"7d ({long_name})", "7d (Fable", "7d(Fable)", "(Fable)",
+                      "12345678 (Fable)"):
+            with self.subTest(label=label):
+                self.assertEqual(self.compact({label: self.window()})["q"], [])
+        # A supported scope's display name may be long; the wire carries only its code.
+        with mock.patch.dict(quota.CLAUDE_SCOPED_CODES, {long_name: "L"}):
+            windows = quota.claude_windows_from_limits(limits)
+            self.assertEqual(list(windows), [f"7d ({long_name})"])
+            payload = self.compact(windows)
+        self.assertEqual(self.identities(payload), [("L", "7d")])
+        self.assertNotIn("Fable", json.dumps(payload))
+
+
+class PhoneContractTests(WatchTools):
+    """The phone forwards a payload whole or not at all."""
+
+    AT = 1_800_000_000
+    ROW: ClassVar[dict[str, Any]] = {"s": "C", "w": "5h", "u": 20, "r": AT + 3600, "d": 18_000, "p": 0}
+
+    def send(self, payload: Any) -> dict[str, list]:
+        return self.phone_run({"status": 200, "body": json.dumps(payload)})
+
+    def payload(self, rows: Any, **fields: Any) -> dict[str, Any]:
+        return {"v": 1, "at": self.AT, "q": rows, **fields}
+
+    def test_valid_payloads_of_zero_one_and_five_rows(self):
+        self.assertEqual(self.send(self.payload([], n="CX"))["sent"],
+                         [{"COLLECTED_AT": self.AT, "ROW_COUNT": 0, "UNAVAILABLE": "CX"}])
+        self.assertEqual(self.send(self.payload([self.ROW], t=-15))["sent"], [{
+            "COLLECTED_AT": self.AT, "ROW_COUNT": 1, "UNAVAILABLE": "", "TEMP": -15,
+            "S0": "C", "W0": "5h", "U0": 20, "R0": self.AT + 3600, "D0": 18_000,
+            "O0": self.AT, "E0": 0}])
+        rows = [dict(self.ROW, s="CFXGH"[index], w=f"{index} ~ 789"[:7], o=self.AT - index,
+                     **({"e": 1} if index % 2 else {})) for index in range(5)]
+        [message] = self.send(self.payload(rows))["sent"]
+        self.assertEqual(message["ROW_COUNT"], 5)
+        self.assertEqual([[message[f"{key}{index}"] for key in "SWOE"] for index in range(5)],
+                         [[row["s"], row["w"], row["o"], row.get("e", 0)] for row in rows])
+
+    def test_unsupported_versions_and_malformed_payloads_are_rejected_whole(self):
+        row, payload = self.ROW, self.payload
+        bad_rows: list[Any] = [None, [], "row"]
+        bad_rows += [{key: value for key, value in row.items() if key != missing} for missing in "swurd"]
+        for key, values in {"s": ["", "CC", "c", 1, None], "w": ["", "12345678", "é", "a\tb", 5],
+                            "u": [-1, 101, 20.5, "20", True, None], "r": [-1, 2**31, 1.5, "1"],
+                            "d": [0, 21_474_837, 60.5], "o": [-1, 2**31, "1", None],
+                            "e": [-1, 2, True, None]}.items():
+            bad_rows += [dict(row, **{key: value}) for value in values]
+        payloads = [None, [], "text", 1, {"at": self.AT, "q": [row]},
+                    payload([row], v=0), payload([row], v=2), payload([row], v="1"),
+                    {"v": 1, "q": [row]}, payload([row], at=None), payload([row], at=-1),
+                    payload([row], at=1.5), payload([row], at=2**31), payload([row], at="1"),
+                    payload(None), payload({"0": row}), payload([row] * 6), payload([row] * 4, n="CX"),
+                    payload([row], n="cx"), payload([row], n="ABCD"), payload([row], n=5),
+                    payload([row], n=None), payload([row], t=1.5), payload([row], t="20"),
+                    payload([row], t=None)]
+        payloads += [payload([row, bad]) for bad in bad_rows]
+        for body in payloads:
+            with self.subTest(body=body):
+                result = self.send(body)
+                self.assertEqual(result["sent"], [])
+                self.assertEqual(len(result["log"]), 1)
+                self.assertTrue(result["log"][0].startswith("Rejected quota data: "), result["log"])
+        self.assertEqual(self.send(payload([row], v=2))["log"], ["Rejected quota data: unsupported version 2"])
+        broken = self.phone_run({"status": 200, "body": "{broken"})
+        self.assertEqual(broken["sent"], [])
+        self.assertTrue(broken["log"][0].startswith("Rejected quota data: "))
+
+    def test_message_keys_match_package_json_and_five_rows_fit_the_inbox(self):
+        declared = json.loads((self.WATCHFACE / "package.json").read_text())["pebble"]["messageKeys"]
+        self.assertEqual(len(declared), len(set(declared)))
+        source = (self.WATCHFACE / "src/c/watchface.c").read_text()
+        self.assertEqual(set(re.findall(r"MESSAGE_KEY_(\w+)", source)), set(declared))
+        # The largest valid message: five rows with seven-character windows and a temperature.
+        rows = [dict(self.ROW, w="7d (x)!", o=self.AT, e=1) for _ in range(5)]
+        [message] = self.send(self.payload(rows, t=-(2**31 - 1)))["sent"]
+        self.assertEqual(set(message) | {"REQUEST_SYNC"}, set(declared))
+        # Pebble's dictionary: a count byte, then per tuple a 7-byte key/type/length
+        # header and the value, 4 bytes per integer and strings with their terminator.
+        size = 1 + sum(7 + (len(value.encode()) + 1 if isinstance(value, str) else 4)
+                       for value in message.values())
+        self.assertEqual(size, 437)
+        self.assertLessEqual(size, 2048)  # app_message_open's inbox
+
+
+class WatchDecodeTests(WatchTools):
+    """The watch replaces its state only with a complete, valid message."""
+
+    NOW = 1_800_000_000
+    WEEK = NOW + 302_400
+    FIVE: ClassVar[list[tuple]] = [("C", "5h", NOW + 3600, 18_000), ("C", "7d", WEEK, 604_800),
+                                   ("F", "7d", WEEK, 604_800), ("X", "5h", NOW + 3600, 18_000),
+                                   ("X", "7d", WEEK, 604_800)]
+    UNPAIRED: ClassVar[list[str]] = ["Claude 5h", "Claude 7d", "Fable 7d", "Codex 5h", "Codex 7d"]
+
+    def message(self, rows: list[tuple], unavailable: str = "", **overrides: Any) -> list[tuple]:
+        """Typed tuples as the phone sends them; an override of None drops the key."""
+        fields: dict[str, Any] = {"COLLECTED_AT": ("i4", self.NOW), "ROW_COUNT": ("i4", len(rows)),
+                                  "UNAVAILABLE": ("s", unavailable), "TEMP": ("i4", 215)}
+        for index, (service, window, reset, duration) in enumerate(rows):
+            fields.update({f"S{index}": ("s", service), f"W{index}": ("s", window),
+                           f"U{index}": ("i4", 20), f"R{index}": ("i4", reset),
+                           f"D{index}": ("i4", duration), f"O{index}": ("i4", self.NOW),
+                           f"E{index}": ("i4", 0)})
+        fields.update(overrides)
+        return [(key, *value) for key, value in fields.items() if value is not None]
+
+    def titles(self, *messages: list[tuple]) -> tuple[list[str], list[str]]:
+        verdicts, _, gauges = self.decode(list(messages), self.NOW)
+        return verdicts, [gauge[0] for gauge in gauges]
+
+    def test_wrong_missing_or_out_of_range_fields_reject_the_whole_message(self):
+        cases: list[dict[str, Any]] = [{key: None} for key in ("COLLECTED_AT", "ROW_COUNT", "UNAVAILABLE")]
+        cases += [{f"{key}1": None} for key in "SWURDOE"]
+        cases += [
+            {"U1": ("s", "20")}, {"S1": ("i4", 67)}, {"W1": ("b", "5h")}, {"E1": ("b", "0")},
+            {"COLLECTED_AT": ("s", "1")}, {"ROW_COUNT": ("b", "2")}, {"TEMP": ("s", "21")},
+            {"UNAVAILABLE": ("i4", 0)}, {"U1": ("i8", 20)}, {"R1": ("i8", 1)},
+            {"W1": ("z", "7d")}, {"UNAVAILABLE": ("z", "X")},
+            {"COLLECTED_AT": ("i4", -1)}, {"ROW_COUNT": ("i4", -1)}, {"ROW_COUNT": ("i4", 6)},
+            {"ROW_COUNT": ("i4", 3)}, {"U1": ("i4", -1)}, {"U1": ("i4", 101)}, {"R1": ("i4", -1)},
+            {"R1": ("u4", 2**31)}, {"D1": ("i4", 0)}, {"D1": ("i4", 21_474_837)},
+            {"O1": ("i4", -1)}, {"E1": ("i4", 2)}, {"S1": ("s", "")}, {"S1": ("s", "CC")},
+            {"S1": ("s", "c")}, {"W1": ("s", "")}, {"W1": ("s", "12345678")}, {"W1": ("s", "é")},
+            {"W1": ("s", "a\x01")}, {"UNAVAILABLE": ("s", "x")}, {"UNAVAILABLE": ("s", "ABCD")},
+        ]
+        two = self.FIVE[:2]
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                # The rejected message leaves the five earlier rows exactly as they were.
+                self.assertEqual(self.titles(self.message(self.FIVE, R2=("i4", self.WEEK + 1)),
+                                             self.message(two, **overrides)),
+                                 (["accepted", "rejected"], self.UNPAIRED))
+
+    def test_integers_of_any_tuple_width_and_absent_temperature_are_valid(self):
+        message = self.message([self.FIVE[0]], "X", ROW_COUNT=("u1", 1), U0=("i1", 20), R0=("u4", self.NOW + 3600),
+                               D0=("i2", 18_000), E0=("u2", 0), TEMP=None)
+        verdicts, temperature, gauges = self.decode([message], self.NOW)
+        self.assertEqual((verdicts, temperature), (["accepted"], "hidden"))
+        self.assertEqual(gauges, [("Claude 5h", "updated 0m ago", "green", "-", 1, 80),
+                                  ("Codex", "unavailable", "unavailable", "-", 0, 0)])
+
+    def test_a_valid_message_replaces_every_row(self):
+        self.assertEqual(self.titles(self.message(self.FIVE),
+                                     self.message([("X", "60m", self.NOW + 600, 3600)], "C")),
+                         (["accepted", "accepted"], ["Codex 60m", "Claude"]))
+
+    def test_claude_and_fable_share_a_gauge_only_for_the_same_window(self):
+        cases: list[tuple[dict[str, Any], list[str]]] = [
+            ({}, ["Claude 5h", "Claude+Fable 7d", "Codex 5h", "Codex 7d"]),
+            ({"R2": ("i4", self.WEEK + 3600)}, self.UNPAIRED),
+            ({"D2": ("i4", 604_801)}, self.UNPAIRED),
+        ]
+        for overrides, titles in cases:
+            with self.subTest(overrides=overrides):
+                self.assertEqual(self.titles(self.message(self.FIVE, **overrides)), (["accepted"], titles))
+
+    def test_rows_and_unavailable_providers_share_five_lines(self):
+        claude = [*self.FIVE[:2], ("F", "7d", self.WEEK + 1, 604_800), ("G", "7d", self.WEEK, 604_800)]
+        self.assertEqual(self.titles(self.message(claude, "X"), self.message(self.FIVE, "X")),
+                         (["accepted", "rejected"], ["Claude 5h", "Claude 7d", "Fable 7d", "G 7d", "Codex"]))
+        self.assertEqual(self.titles(self.message([], "CX")), (["accepted"], ["Claude", "Codex"]))
+        self.assertEqual(self.titles(self.message([])), (["accepted"], []))

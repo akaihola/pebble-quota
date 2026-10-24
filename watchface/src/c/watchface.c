@@ -19,14 +19,22 @@
 static Window *s_window;
 static Layer *s_canvas;
 static char s_time[8];
-static time_t s_collected_at;
 
-static QuotaRow s_rows[MAX_ROWS];
-static int s_row_count;
-static char s_unavailable[4];  // service codes of providers without rows
-static Gauge s_gauges[MAX_GAUGES];  // static: too large for the draw callback's stack
-static int s_temp_tenths;   // outside temperature, tenths of degC
-static bool s_has_temp;     // whether the latest received message included temperature
+// Static: these are too large for the callbacks' stacks.
+static QuotaMessage s_quota;     // the last valid message
+static QuotaMessage s_incoming;  // decoding scratch; replaces s_quota only when valid
+static Field s_fields[MESSAGE_FIELDS];
+static Gauge s_gauges[MAX_GAUGES];
+
+// Message keys in decode_message's field order.
+static const uint32_t *const s_keys[MESSAGE_FIELDS] = {
+  &MESSAGE_KEY_COLLECTED_AT, &MESSAGE_KEY_ROW_COUNT, &MESSAGE_KEY_TEMP, &MESSAGE_KEY_UNAVAILABLE,
+  &MESSAGE_KEY_S0, &MESSAGE_KEY_W0, &MESSAGE_KEY_U0, &MESSAGE_KEY_R0, &MESSAGE_KEY_D0, &MESSAGE_KEY_O0, &MESSAGE_KEY_E0,
+  &MESSAGE_KEY_S1, &MESSAGE_KEY_W1, &MESSAGE_KEY_U1, &MESSAGE_KEY_R1, &MESSAGE_KEY_D1, &MESSAGE_KEY_O1, &MESSAGE_KEY_E1,
+  &MESSAGE_KEY_S2, &MESSAGE_KEY_W2, &MESSAGE_KEY_U2, &MESSAGE_KEY_R2, &MESSAGE_KEY_D2, &MESSAGE_KEY_O2, &MESSAGE_KEY_E2,
+  &MESSAGE_KEY_S3, &MESSAGE_KEY_W3, &MESSAGE_KEY_U3, &MESSAGE_KEY_R3, &MESSAGE_KEY_D3, &MESSAGE_KEY_O3, &MESSAGE_KEY_E3,
+  &MESSAGE_KEY_S4, &MESSAGE_KEY_W4, &MESSAGE_KEY_U4, &MESSAGE_KEY_R4, &MESSAGE_KEY_D4, &MESSAGE_KEY_O4, &MESSAGE_KEY_E4,
+};
 
 static int clamp_int(int value, int low, int high) {
   return value < low ? low : (value > high ? high : value);
@@ -210,7 +218,7 @@ static void canvas_update(Layer *layer, GContext *ctx) {
   // When a fresh temperature is present, centre the time in the left part of the
   // band and place the reading in the reserved right slice; otherwise use the
   // full width so absent-temperature layout is unchanged.
-  bool temp = show_temperature(s_has_temp, s_collected_at, now);
+  bool temp = show_temperature(&s_quota, now);
   int time_w = temp ? w - TEMP_BAND_W : w;
   graphics_draw_text(ctx, s_time, fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS),
                      GRect(0, 3, time_w, TIME_BAND_H - 3), GTextOverflowModeFill,
@@ -218,7 +226,8 @@ static void canvas_update(Layer *layer, GContext *ctx) {
   if (temp) {
     char temp_text[8];
     // Round tenths to nearest whole degree, ties away from zero, e.g. "22°".
-    int deg = (s_temp_tenths >= 0 ? s_temp_tenths + 5 : s_temp_tenths - 5) / 10;
+    int tenths = s_quota.temp_tenths;
+    int deg = (tenths >= 0 ? tenths + 5 : tenths - 5) / 10;
     snprintf(temp_text, sizeof(temp_text), "%d°", deg);
     graphics_draw_text(ctx, temp_text, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD),
                        GRect(w - TEMP_BAND_W, 13, TEMP_BAND_W - 4, 30),
@@ -231,7 +240,7 @@ static void canvas_update(Layer *layer, GContext *ctx) {
   // Bottom: compact pace bars. The first gauge's title row carries the sync
   // status unless that gauge has a state of its own to show.
   int avail = h - PACE_TOP;
-  int count = plan_gauges(s_rows, s_row_count, s_unavailable, s_collected_at, now, s_gauges);
+  int count = plan_gauges(&s_quota, now, s_gauges);
   if (count == 0) {
     graphics_context_set_text_color(ctx, GColorLightGray);
     graphics_draw_text(ctx, "Waiting for quota data",
@@ -256,45 +265,23 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
 }
 
-static int32_t tuple_int(DictionaryIterator *iter, uint32_t key, int32_t fallback) {
+static Field tuple_field(DictionaryIterator *iter, uint32_t key) {
   Tuple *tuple = dict_find(iter, key);
-  return tuple ? tuple->value->int32 : fallback;
-}
-
-static void tuple_string(DictionaryIterator *iter, uint32_t key, char *target, size_t size) {
-  Tuple *tuple = dict_find(iter, key);
-  if (tuple && tuple->type == TUPLE_CSTRING) snprintf(target, size, "%s", tuple->value->cstring);
+  if (!tuple) return (Field){FIELD_MISSING, 0, NULL};
+  FieldType type = tuple->type == TUPLE_CSTRING ? FIELD_STRING
+                 : tuple->type == TUPLE_UINT ? FIELD_UINT
+                 : tuple->type == TUPLE_INT ? FIELD_INT : FIELD_BYTES;
+  return (Field){type, tuple->length, tuple->value};
 }
 
 static void inbox_received(DictionaryIterator *iter, void *context) {
-  s_collected_at = tuple_int(iter, MESSAGE_KEY_COLLECTED_AT, s_collected_at);
-  s_row_count = clamp_int(tuple_int(iter, MESSAGE_KEY_ROW_COUNT, 0), 0, MAX_ROWS);
-  s_unavailable[0] = '\0';
-  tuple_string(iter, MESSAGE_KEY_UNAVAILABLE, s_unavailable, sizeof(s_unavailable));
-
-  const uint32_t service_keys[] = {MESSAGE_KEY_S0, MESSAGE_KEY_S1, MESSAGE_KEY_S2, MESSAGE_KEY_S3, MESSAGE_KEY_S4};
-  const uint32_t window_keys[] = {MESSAGE_KEY_W0, MESSAGE_KEY_W1, MESSAGE_KEY_W2, MESSAGE_KEY_W3, MESSAGE_KEY_W4};
-  const uint32_t used_keys[] = {MESSAGE_KEY_U0, MESSAGE_KEY_U1, MESSAGE_KEY_U2, MESSAGE_KEY_U3, MESSAGE_KEY_U4};
-  const uint32_t reset_keys[] = {MESSAGE_KEY_R0, MESSAGE_KEY_R1, MESSAGE_KEY_R2, MESSAGE_KEY_R3, MESSAGE_KEY_R4};
-  const uint32_t duration_keys[] = {MESSAGE_KEY_D0, MESSAGE_KEY_D1, MESSAGE_KEY_D2, MESSAGE_KEY_D3, MESSAGE_KEY_D4};
-  const uint32_t observed_keys[] = {MESSAGE_KEY_O0, MESSAGE_KEY_O1, MESSAGE_KEY_O2, MESSAGE_KEY_O3, MESSAGE_KEY_O4};
-  const uint32_t failed_keys[] = {MESSAGE_KEY_E0, MESSAGE_KEY_E1, MESSAGE_KEY_E2, MESSAGE_KEY_E3, MESSAGE_KEY_E4};
-
-  for (int i = 0; i < s_row_count; ++i) {
-    tuple_string(iter, service_keys[i], s_rows[i].service, sizeof(s_rows[i].service));
-    tuple_string(iter, window_keys[i], s_rows[i].window, sizeof(s_rows[i].window));
-    s_rows[i].used = tuple_int(iter, used_keys[i], 0);
-    s_rows[i].resets_at = tuple_int(iter, reset_keys[i], 0);
-    s_rows[i].duration = tuple_int(iter, duration_keys[i], 0);
-    s_rows[i].observed_at = tuple_int(iter, observed_keys[i], s_collected_at);
-    s_rows[i].failed = tuple_int(iter, failed_keys[i], 0) != 0;
+  for (int i = 0; i < MESSAGE_FIELDS; ++i) s_fields[i] = tuple_field(iter, *s_keys[i]);
+  // A malformed message changes nothing; the shown rows keep aging.
+  if (!decode_message(s_fields, &s_incoming)) {
+    APP_LOG(APP_LOG_LEVEL_WARNING, "Rejected malformed quota message");
+    return;
   }
-
-  // Temperature is optional: absent key -> hide it (handled at draw time).
-  Tuple *temp_tuple = dict_find(iter, MESSAGE_KEY_TEMP);
-  s_has_temp = (temp_tuple != NULL);
-  if (s_has_temp) s_temp_tenths = temp_tuple->value->int32;
-
+  s_quota = s_incoming;
   layer_mark_dirty(s_canvas);
 }
 

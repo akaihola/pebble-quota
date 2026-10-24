@@ -16,6 +16,12 @@ PEBBLE_QUOTA_TOKEN='replace-me' python3 collector/pebble_quota.py serve
 
 `collect` writes a local snapshot and prints the compact payload. `serve`
 refreshes in the background and exposes the API on loopback by default.
+
+The watch has room for five gauge lines. A provider without rows takes one for
+its `unavailable` line. Rows fill the rest: first the core windows (Claude's
+5-hour and weekly, Codex's two windows), which always fit, then scoped extras
+such as Fable, shortest window first. The phone and the watch reject a payload
+or message that breaks this contract as a whole.
 See the [collector guide] for settings, the complete payload schema, retry and
 freshness behavior, and deployment assumptions.
 
@@ -39,7 +45,7 @@ ty check
 
 The suite uses synthetic provider responses, fake subprocesses and loopback HTTP
 servers; it blocks real provider access. Its watch pipeline tests run the phone
-script under Node and compile the watch's gauge rules with the host C compiler;
+script under Node and compile the watch's message and gauge rules with the host C compiler;
 they are skipped when `node` or `cc` is missing. [Ruff] and [ty] run with their default
 rules, without project configuration, and report no findings; a `noqa: BLE001`
 comment explains each deliberate broad `except`. CI currently builds and checks

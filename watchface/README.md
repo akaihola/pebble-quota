@@ -36,11 +36,17 @@ gauge is fresh, and the gauge's own state otherwise. The temperature hides once
 its pass is more than 25 minutes old. Only a newer valid reading clears a stale
 state.
 
-When both Claude and Fable weekly rows exist, they share two bars separated by
-1 px and a single marker computed from Claude's row. Pairing assumes equal
-resets and durations but does not check them. Both bar colors use that shared
-elapsed value. See [collector freshness] for the policy, timestamp meaning,
-temperature validation, and rollout order.
+When Claude and Fable weekly rows have the same reset time and duration, they
+share two bars separated by 1 px and a single marker computed from Claude's
+row; both bar colors use that shared elapsed value. Otherwise `Fable 7d` gets
+its own line. The face has room for five lines, and the collector sends only as
+many rows as fit beside the unavailable providers' lines; see
+[five gauge lines]. See [collector freshness] for the policy, timestamp
+meaning, temperature validation, and rollout order.
+
+The phone drops a payload with an unsupported version or a malformed field and
+logs why; the watch keeps what it shows unless a whole message is valid. Either
+way the old rows keep aging. [Phone and watch validation] lists the checks.
 
 The rules live in [the gauge module], which has no Pebble dependency; the test
 suite compiles it on the host.
@@ -158,6 +164,8 @@ settings; their reconciliation and upload-retry procedure remain in the
 [operations proposal]. Collector deployment is outside this workflow.
 
 [collector freshness]: ../docs/collector.md#display-freshness-policy
+[five gauge lines]: ../docs/collector.md#five-gauge-lines
+[Phone and watch validation]: ../docs/collector.md#phone-and-watch-validation
 [the gauge module]: src/c/gauges.c
 [freshness change]: ../docs/tasks/9-carry-freshness-and-failure-status-through-to-watch-rendering.md
 [screenshot]: quota-pace.png

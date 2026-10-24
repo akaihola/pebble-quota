@@ -3,6 +3,81 @@
 #include <stdio.h>
 #include <string.h>
 
+// Integers may arrive as signed or unsigned tuples of 1, 2 or 4 bytes.
+static bool field_int(const Field *field, int32_t low, int32_t high, int32_t *out) {
+  union { int8_t i8; uint8_t u8; int16_t i16; uint16_t u16; int32_t i32; uint32_t u32; } value;
+  if ((field->type != FIELD_INT && field->type != FIELD_UINT)
+      || (field->length != 1 && field->length != 2 && field->length != 4)) {
+    return false;
+  }
+  memcpy(&value, field->data, field->length);
+  bool is_signed = field->type == FIELD_INT;
+  int64_t number = field->length == 1 ? (is_signed ? value.i8 : value.u8)
+                 : field->length == 2 ? (is_signed ? value.i16 : value.u16)
+                 : (is_signed ? value.i32 : (int64_t)value.u32);
+  if (number < low || number > high) return false;
+  *out = (int32_t)number;
+  return true;
+}
+
+// A terminated string of min to max characters, each from low to high.
+static bool field_string(const Field *field, size_t min, size_t max, char low, char high,
+                         char *out) {
+  if (field->type != FIELD_STRING) return false;
+  const char *text = field->data;
+  size_t length = 0;
+  if (field->length > 0) {
+    const char *end = memchr(text, '\0', field->length);
+    if (!end) return false;
+    length = (size_t)(end - text);
+  }
+  if (length < min || length > max) return false;
+  for (size_t i = 0; i < length; ++i) {
+    if (text[i] < low || text[i] > high) return false;
+    out[i] = text[i];
+  }
+  out[length] = '\0';
+  return true;
+}
+
+bool decode_message(const Field *fields, QuotaMessage *out) {
+  memset(out, 0, sizeof(*out));
+  int32_t value;
+  if (!field_int(&fields[KEY_COLLECTED_AT], 0, INT32_MAX, &value)) return false;
+  out->collected_at = value;
+  if (!field_int(&fields[KEY_ROW_COUNT], 0, MAX_ROWS, &value)) return false;
+  out->row_count = value;
+  if (!field_string(&fields[KEY_UNAVAILABLE], 0, MAX_UNAVAILABLE, 'A', 'Z', out->unavailable)
+      || out->row_count + (int)strlen(out->unavailable) > MAX_GAUGES) {
+    return false;
+  }
+  out->has_temp = fields[KEY_TEMP].type != FIELD_MISSING;
+  if (out->has_temp) {
+    if (!field_int(&fields[KEY_TEMP], INT32_MIN, INT32_MAX, &value)) return false;
+    out->temp_tenths = value;
+  }
+  for (int i = 0; i < out->row_count; ++i) {
+    const Field *field = &fields[KEY_ROWS + i * ROW_KEYS];
+    QuotaRow *row = &out->rows[i];
+    int32_t used, resets_at, duration, observed_at, failed;
+    if (!field_string(&field[KEY_S], 1, 1, 'A', 'Z', row->service)
+        || !field_string(&field[KEY_W], 1, MAX_WINDOW, ' ', '~', row->window)
+        || !field_int(&field[KEY_U], 0, 100, &used)
+        || !field_int(&field[KEY_R], 0, INT32_MAX, &resets_at)
+        || !field_int(&field[KEY_D], 1, MAX_DURATION_SECONDS, &duration)
+        || !field_int(&field[KEY_O], 0, INT32_MAX, &observed_at)
+        || !field_int(&field[KEY_E], 0, 1, &failed)) {
+      return false;
+    }
+    row->used = used;
+    row->resets_at = resets_at;
+    row->duration = duration;
+    row->observed_at = observed_at;
+    row->failed = failed != 0;
+  }
+  return true;
+}
+
 int elapsed_percent(const QuotaRow *row, time_t now) {
   if (row->duration <= 0) return 0;
   time_t remaining = row->resets_at - now;
@@ -63,14 +138,16 @@ static int find_row(const QuotaRow *rows, int count, char service, const char *w
   return -1;
 }
 
-int plan_gauges(const QuotaRow *rows, int row_count, const char *unavailable,
-                time_t collected_at, time_t now, Gauge *gauges) {
-  if (row_count <= 0) return 0;
-  // Pair weekly Claude/Fable rows by identity. This assumes equal resets and
-  // durations; the pairing does not check them.
+int plan_gauges(const QuotaMessage *quota, time_t now, Gauge *gauges) {
+  const QuotaRow *rows = quota->rows;
+  int row_count = quota->row_count;
+  // Weekly Claude and Fable rows share a gauge only when they describe the same
+  // window; otherwise each takes its own line.
   int claude_7d = find_row(rows, row_count, 'C', "7d");
   int fable_7d = find_row(rows, row_count, 'F', "7d");
-  bool paired = claude_7d >= 0 && fable_7d >= 0;
+  bool paired = claude_7d >= 0 && fable_7d >= 0
+      && rows[claude_7d].resets_at == rows[fable_7d].resets_at
+      && rows[claude_7d].duration == rows[fable_7d].duration;
   int count = 0;
   for (int i = 0; i < row_count; ++i) {
     if (paired && i == fable_7d) continue;
@@ -93,7 +170,7 @@ int plan_gauges(const QuotaRow *rows, int row_count, const char *unavailable,
       gauge_title(rows[i].service[0], rows[i].window, gauge->title, sizeof(gauge->title));
     }
   }
-  for (const char *code = unavailable; code && *code && count < MAX_GAUGES; ++code) {
+  for (const char *code = quota->unavailable; *code && count < MAX_GAUGES; ++code) {
     Gauge *gauge = &gauges[count++];
     memset(gauge, 0, sizeof(*gauge));
     const char *name = provider_name(*code);
@@ -102,10 +179,11 @@ int plan_gauges(const QuotaRow *rows, int row_count, const char *unavailable,
     snprintf(gauge->status, sizeof(gauge->status), "unavailable");
     gauge->states[0] = ROW_UNAVAILABLE;
   }
+  if (count == 0) return 0;
   // A fresh first gauge carries the sync status instead of its own.
   if (!gauges[0].status[0]) {
-    if (collected_at > 0) {
-      time_t age = now - collected_at;
+    if (quota->collected_at > 0) {
+      time_t age = now - quota->collected_at;
       snprintf(gauges[0].status, sizeof(gauges[0].status), "updated %dm ago",
                age > 0 ? (int)(age / 60) : 0);
     } else {
@@ -115,6 +193,7 @@ int plan_gauges(const QuotaRow *rows, int row_count, const char *unavailable,
   return count;
 }
 
-bool show_temperature(bool has_temp, time_t collected_at, time_t now) {
-  return has_temp && now - collected_at <= FRESH_SECONDS && !from_future(collected_at, now);
+bool show_temperature(const QuotaMessage *quota, time_t now) {
+  return quota->has_temp && now - quota->collected_at <= FRESH_SECONDS
+      && !from_future(quota->collected_at, now);
 }

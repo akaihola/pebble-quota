@@ -1,6 +1,7 @@
 // Run the phone script against one synthetic quota response and print the
-// AppMessages it sends. Usage: node phone.js <index.js> < response.json, where
-// the response is {"status": 200, "body": "..."} or {"error": true}.
+// AppMessages it sends and its log as {"sent": [...], "log": [...]}. Usage:
+// node phone.js <index.js> < response.json, where the response is
+// {"status": 200, "body": "..."} or {"error": true}.
 "use strict";
 const fs = require("fs");
 const vm = require("vm");
@@ -9,6 +10,7 @@ const response = JSON.parse(fs.readFileSync(0, "utf8"));
 const listeners = {};
 const requests = [];
 const sent = [];
+const log = [];
 
 function FakeRequest() {
   this.open = function () {};
@@ -19,7 +21,7 @@ function FakeRequest() {
 }
 
 const context = vm.createContext({
-  console: { log: function () {} },
+  console: { log: function (line) { log.push(String(line)); } },
   localStorage: { getItem: function () { return null; }, setItem: function () {} },
   setInterval: function () {},
   XMLHttpRequest: FakeRequest,
@@ -44,4 +46,4 @@ for (const request of requests) {
     request.onload();
   }
 }
-process.stdout.write(JSON.stringify(sent));
+process.stdout.write(JSON.stringify({ sent: sent, log: log }));

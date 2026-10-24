@@ -65,9 +65,9 @@ The compact payload has these top-level fields:
 
 | Field | Meaning |
 | --- | --- |
-| `v` | Protocol version, currently `1`; the phone does not validate it yet |
+| `v` | Protocol version, currently `1`; the phone rejects any other value |
 | `at` | Snapshot `collected_at` as integral Unix seconds; collection-pass time, not each provider's last success |
-| `q` | At most five validated quota rows |
+| `q` | Validated quota rows, at most five less one per provider in `n`; see [five gauge lines] |
 | `n` | Optional service codes (`C`, `X`) of providers without rows, for example `"X"` after a failed Codex read |
 | `t` | Optional outside temperature in integer tenths of Celsius, read in the pass `at` |
 
@@ -75,7 +75,7 @@ Each row contains:
 
 | Field | Meaning |
 | --- | --- |
-| `s` | `C` for Claude, `F` for Claude's Fable scope, `X` for Codex |
+| `s` | One-letter wire code: `C` for Claude, `F` for Claude's Fable scope, `X` for Codex |
 | `w` | Window label, usually `5h` or `7d`; other Codex durations use `<minutes>m` |
 | `u` | Integer percentage used, rounded with Python's `round` |
 | `r` | Reset time as integral Unix seconds |
@@ -93,12 +93,55 @@ Synthetic example at the start of a five-hour window:
 {"v":1,"at":1800000000,"q":[{"s":"C","w":"5h","u":20,"r":1800018000,"d":18000,"p":-20,"o":1800000000}],"t":215}
 ```
 
-Rows are emitted in Claude-then-Codex order, preserving each normalized windows
-mapping's order, then truncated to five. Disk snapshots are written with sorted
-keys, so HTTP reads can differ in within-service order from the immediate
-`collect` output. There is no separate priority policy for overflow; the phone
-also takes only five rows. Fable's full-snapshot label `7d (Fable)` becomes
-`s: "F", w: "7d"` on the wire.
+### Five gauge lines
+
+The watch has room for five gauge lines. Each provider listed in `n` takes one
+for its `unavailable` line, and rows fill the rest in this priority:
+
+1. core (unscoped) windows before scoped extras;
+2. Claude before Codex;
+3. shorter window first, then wire code, then window label.
+
+Claude's adapters produce at most two core windows (5h and 7d) and Codex's at
+most two (its primary and secondary windows), so every core window always gets
+a line. Scoped extras, Fable today and any scope added later, fill the lines
+left over in a stable order. The chosen rows are sent in display order:
+Claude, its scoped extras, then Codex, each by duration. The order no longer
+depends on the snapshot's mapping order, so `collect` output and HTTP reads
+agree.
+
+### Wire identity
+
+A row's identity on the wire is its one-letter code `s` and its window `w` of
+one to seven printable ASCII characters. Provider display names never cross the
+wire. The snapshot keeps a scope's display name in its window label, for
+example `7d (Fable)`, and a table in the [collector] maps each supported scope
+to its code (`Fable` → `F`). A new scope needs only a new table entry; the
+watch names known codes itself and shows an unknown code as its letter. Claude
+labels with any other parenthesised scope are invalid, however short.
+
+### Phone and watch validation
+
+The phone checks the whole payload before it builds a message: `v` must be 1,
+`at` an integer from 0 through 2147483647, `n` absent or up to three capital
+letters, `t` absent or a signed 32-bit integer, and `q` an array whose length
+plus the length of `n` is at most five. Each row needs `s` (one capital
+letter), `w` (one to seven printable ASCII characters), `u` (0–100), `r`
+(0–2147483647) and `d` (1–21,474,836) as integers. `o` may be absent or an
+integer timestamp, and `e` absent, 0 or 1. The phone does not read `p`. Any
+failure, including unparsable JSON, logs `Rejected quota data:` with the reason
+and sends nothing, as a failed request does, so the watch keeps aging its last
+valid rows until they turn stale.
+
+The watch decodes each message into scratch space and replaces what it shows
+only when the whole message is valid. Integers must be signed or unsigned
+tuples of 1, 2 or 4 bytes within the same ranges, and strings terminated C
+strings within the same bounds. `COLLECTED_AT`, `ROW_COUNT`, `UNAVAILABLE` and
+all seven keys of every counted row are required; `TEMP` is optional. A
+rejected message leaves no partial rows or stale labels behind.
+
+The largest valid message, five rows with seven-character windows and a
+temperature, takes 437 bytes of the watch's 2,048-byte inbox.
 
 ## Snapshot validation and failures
 
@@ -117,8 +160,9 @@ Quota windows are validated individually on collection and every snapshot read:
   watch. Numeric strings and timestamps without timezones are rejected.
 - **Duration:** integer seconds from 1 through 21,474,836, keeping the watch's
   duration-times-100 calculation within signed 32-bit range.
-- **Labels:** one to seven printable ASCII characters after the Fable mapping.
-  The Claude adapter accepts only the supported unscoped windows and Fable scope;
+- **Labels:** a window of one to seven printable ASCII characters, plus for
+  Claude an optional supported scope as in `7d (Fable)`; see [wire identity].
+  The Claude adapter accepts only the supported unscoped windows and scopes;
   malformed or unsupported scopes are skipped.
 
 Malformed containers and scheduling fields are discarded. Healthy providers
@@ -251,6 +295,14 @@ either direction. A new bundle that meets an old collector falls back to `at`
 for each row. Offline aging and reset handling still work, but rows retained
 after a Claude failure look fresh and a missing provider is not listed.
 
+The five-line contract changed no wire field and no version. Its collector
+only chooses and orders rows. Collectors since the [window validation change]
+already send version 1 payloads that pass the new phone's checks: bounded
+labels, Fable as the only scope, and at most four lines with a provider
+missing. Old bundles keep slicing to five and pairing Claude and Fable by
+identity alone. Collector and bundle can therefore be deployed and rolled back
+independently, in either order.
+
 ## Deployment boundary
 
 The documented deployment uses `gogo`, `pebble-quota.service`, and the private
@@ -265,6 +317,9 @@ recovery runbook are tracked by the [operations proposal]. This source review
 does not establish current production configuration or authorize a restart.
 
 [collector]: ../collector/pebble_quota.py
+[five gauge lines]: #five-gauge-lines
+[wire identity]: #wire-identity
+[window validation change]: tasks/8-validate-windows-and-loaded-snapshots-before-publication.md
 [quick start]: ../README.md#collector
 [phone settings]: ../watchface/README.md#phone-settings
 [Codex adapter task]: tasks/10-report-codex-rpc-failures-and-reap-the-subprocess-reliably.md
