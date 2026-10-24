@@ -1,7 +1,6 @@
-// Run the phone script against one synthetic quota response and print the
-// AppMessages it sends and its log as {"sent": [...], "log": [...]}. Usage:
-// node phone.js <index.js> < response.json, where the response is
-// {"status": 200, "body": "..."} or {"error": true}.
+// node phone.js <index.js> < fixture.json
+// A single {status, body}/{error} completes ready immediately. A {steps: [...]}
+// fixture emits events and completes indexed requests in any chosen order.
 "use strict";
 const fs = require("fs");
 const vm = require("vm");
@@ -11,39 +10,76 @@ const listeners = {};
 const requests = [];
 const sent = [];
 const log = [];
+const delivered = [];
+const settings = {};
+const requestDetails = [];
+let interval;
+let now = 0;
+let failMessages = 0;
 
 function FakeRequest() {
-  this.open = function () {};
-  this.setRequestHeader = function () {};
+  const details = { headers: {} };
+  this.open = function (method, url) { details.url = url; };
+  this.setRequestHeader = function (name, value) { details.headers[name] = value; };
   this.send = function () {
     requests.push(this);
+    requestDetails.push(details);
   };
 }
 
 const context = vm.createContext({
   console: { log: function (line) { log.push(String(line)); } },
-  localStorage: { getItem: function () { return null; }, setItem: function () {} },
-  setInterval: function () {},
+  localStorage: {
+    getItem: function (key) { return settings[key] || null; },
+    setItem: function (key, value) { settings[key] = value; },
+  },
+  Date: { now: function () { return now; } },
+  setInterval: function (callback) { interval = callback; },
+  setTimeout: function () { throw new Error("Unexpected retry timer"); },
   XMLHttpRequest: FakeRequest,
   Pebble: {
     addEventListener: function (name, handler) {
       listeners[name] = handler;
     },
-    sendAppMessage: function (message) {
+    sendAppMessage: function (message, onSent, onFailed) {
       sent.push(message);
+      if (failMessages > 0) {
+        failMessages--;
+        onFailed({ error: "busy" });
+      } else {
+        delivered.push(message);
+        onSent();
+      }
     },
     openURL: function () {},
   },
 });
 vm.runInContext(fs.readFileSync(process.argv[2], "utf8"), context);
-listeners.ready();
-for (const request of requests) {
-  if (response.error) {
+function complete(request, result) {
+  if (result.error) {
     request.onerror();
+  } else if (result.timeout) {
+    request.ontimeout();
   } else {
-    request.status = response.status;
-    request.responseText = response.body;
+    request.status = result.status;
+    request.responseText = result.body;
     request.onload();
   }
 }
-process.stdout.write(JSON.stringify({ sent: sent, log: log }));
+
+if (response.steps) {
+  for (const step of response.steps) {
+    if ("now" in step) now = step.now === null ? NaN : step.now;
+    if ("failMessages" in step) failMessages = step.failMessages;
+    if (step.event === "timer") interval();
+    else if (step.event === "config") {
+      listeners.webviewclosed({ response: encodeURIComponent(JSON.stringify(step.settings)) });
+    } else if (step.event === "watch") listeners.appmessage({ payload: { REQUEST_SYNC: 1 } });
+    else if (step.event) listeners[step.event]();
+    if ("request" in step) complete(requests[step.request], step);
+  }
+} else {
+  listeners.ready();
+  complete(requests[0], response);
+}
+process.stdout.write(JSON.stringify({ sent, log, delivered, requests: requestDetails }));

@@ -1941,6 +1941,84 @@ class PhoneContractTests(WatchTools):
         self.assertEqual(broken["sent"], [])
         self.assertTrue(broken["log"][0].startswith("Rejected quota data: "))
 
+    def completion(self, request: int, at: Any, **fields: Any) -> dict[str, Any]:
+        return {"request": request, "status": 200,
+                "body": json.dumps(self.payload([self.ROW], at=at)), **fields}
+
+    def test_latest_refresh_wins_reverse_ready_watch_and_timer_completions(self):
+        result = self.phone_run({"steps": [
+            {"event": "ready"}, {"event": "watch"}, {"event": "timer"},
+            self.completion(2, 200), self.completion(1, 100), self.completion(0, 300),
+        ]})
+        self.assertEqual([message["COLLECTED_AT"] for message in result["sent"]], [200])
+
+    def test_endpoint_and_token_changes_invalidate_all_older_requests(self):
+        for changed in ("endpoint", "token"):
+            with self.subTest(changed=changed):
+                first = {"endpoint": "https://first.example/v1/watch", "token": "first"}
+                second = dict(first, **{changed: "https://second.example/v1/watch"
+                                       if changed == "endpoint" else "second"})
+                result = self.phone_run({"steps": [
+                    {"event": "ready"}, self.completion(0, 500),
+                    {"event": "watch"}, {"event": "config", "settings": first},
+                    {"event": "config", "settings": second}, self.completion(3, 100),
+                    self.completion(2, 400), self.completion(1, 600),
+                ]})
+                self.assertEqual([m["COLLECTED_AT"] for m in result["sent"]], [500, 100])
+                self.assertEqual(result["requests"][2], {
+                    "url": first["endpoint"], "headers": {"Authorization": "Bearer first"}})
+                self.assertEqual(result["requests"][3], {
+                    "url": second["endpoint"],
+                    "headers": {"Authorization": "Bearer " + second["token"]}})
+
+    def test_timestamp_regressions_expire_without_rejected_requests_extending_guard(self):
+        result = self.phone_run({"steps": [
+            {"event": "ready"}, self.completion(0, 200),
+            {"event": "watch"}, self.completion(1, 100, now=899_999),
+            {"event": "timer"}, self.completion(2, 101, now=900_000),
+        ]})
+        self.assertEqual([m["COLLECTED_AT"] for m in result["sent"]], [200, 101])
+        self.assertIn("Rejected older quota data", result["log"])
+
+    def test_invalid_or_backward_phone_clock_allows_timestamp_recovery(self):
+        for clock in (None, 0):
+            with self.subTest(clock=clock):
+                result = self.phone_run({"steps": [
+                    {"event": "ready", "now": 1000}, self.completion(0, 2**31 - 1),
+                    {"event": "watch"}, self.completion(1, 100, now=clock),
+                    {"event": "watch"}, self.completion(2, 101, now=2000),
+                ]})
+                self.assertEqual([m["COLLECTED_AT"] for m in result["sent"]],
+                                 [2**31 - 1, 100, 101])
+
+    def test_failed_latest_requests_preserve_display_and_do_not_revive_old_requests(self):
+        for failure in ({"error": True}, {"timeout": True}, {"status": 503},
+                        {"status": 200, "body": "{broken"},
+                        {"status": 200, "body": json.dumps(self.payload([], at=None))}):
+            with self.subTest(failure=failure):
+                result = self.phone_run({"steps": [
+                    {"event": "ready"}, self.completion(0, 200),
+                    {"event": "watch"}, {"event": "timer"}, {"request": 2, **failure},
+                    self.completion(1, 300),
+                    {"event": "watch"}, self.completion(3, 201),
+                ]})
+                self.assertEqual([m["COLLECTED_AT"] for m in result["delivered"]], [200, 201])
+                self.assertEqual(result["sent"], result["delivered"])
+
+    def test_appmessage_failure_defers_until_refresh_without_retry_loop(self):
+        for failures in (1, 100):
+            with self.subTest(failures=failures):
+                result = self.phone_run({"steps": [
+                    {"event": "ready"}, self.completion(0, 100),
+                    {"event": "watch", "failMessages": failures}, self.completion(1, 200),
+                    {"event": "timer"}, self.completion(2, 200),
+                ]})
+                self.assertEqual([m["COLLECTED_AT"] for m in result["sent"]], [100, 200, 200])
+                self.assertEqual([m["COLLECTED_AT"] for m in result["delivered"]],
+                                 [100, 200] if failures == 1 else [100])
+                self.assertEqual(len(result["requests"]), 3)
+                self.assertTrue(any("deferred until next refresh" in line for line in result["log"]))
+
     def test_message_keys_match_package_json_and_five_rows_fit_the_inbox(self):
         declared = json.loads((self.WATCHFACE / "package.json").read_text())["pebble"]["messageKeys"]
         self.assertEqual(len(declared), len(set(declared)))

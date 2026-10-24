@@ -1,7 +1,7 @@
-# Prevent older phone responses from overwriting newer settings or data
+# Prevent older phone responses from overwriting data
 
 Steward proposal, 2026-10-19, from architecture audit [5].
-Pending steward promotion; not authorization to implement or deploy.
+Promoted for implementation on 2026-10-24; deployment remains out of scope.
 
 Lower-priority phone ordering/retry item. In a Node VM with delayed mocked
 XHRs, completing at:200 then at:100 delivers 100 last. refresh has no generation
@@ -64,3 +64,62 @@ Promoted from Unverified proposals (steward D13, D95; goal
    settings, clock and delivery outcomes. Test ordering, failures, recovery and
    bounded delivery; run the existing suite, Ruff and ty. Verify regressions
    against the audited baseline, then record checks at the merged commit.
+
+## Implementation and validation
+
+The [phone script] now snapshots settings and increments a refresh sequence at
+request start. Only that sequence can send data. Within the same settings,
+decreasing collector timestamps are rejected for one refresh interval after the
+last forwarded response; rejections do not renew the interval. Equal timestamps
+remain deliverable. Settings changes, interval expiry, and invalid or backward
+phone clocks allow recovery. Invalid wire timestamps still fail whole-payload
+validation. The watermark tracks forwarding attempts, including failed delivery;
+this also bounds a failed future-dated reading's effect to one interval.
+
+AppMessage failures explicitly defer until the next ordinary refresh, which
+fetches current data. There are no delivery timers, retained messages or retries
+inside the failure callback. The [watchface guide] documents this policy.
+
+The [Node fixture] now controls ready/watch/timer/settings events, request
+completion order, endpoint/token storage, phone time, and transient or persistent
+AppMessage failures. [PhoneContractTests] covers:
+
+- **Ordering:** reversed completions, a newer request with an older timestamp,
+  timestamp-window expiry without renewal on rejection, and clock recovery.
+- **Settings and failure:** endpoint-only and token-only switches invalidate
+  pending requests and reset timestamp history. HTTP, network, timeout, malformed
+  JSON and invalid timestamps preserve the last delivered display; a superseded
+  success cannot revive after the newest request fails.
+- **Delivery:** one transient failure recovers on the next refresh, including an
+  equal timestamp; repeated failures produce only one attempt per refresh.
+  A retry timer causes the fixture to fail immediately.
+
+Before merge: all 106 unit tests passed (including all nine phone contract tests,
+with Node and the C compiler available), and Ruff and ty passed. Three acceptance
+regressions were run using the audited phone script at `3bbc2c9`: reversed
+responses, timestamp regression, and explicit deferred delivery all failed as
+expected; the regression probe exited zero after verifying these failures.
+The initial baseline probe needed two harness corrections (the temporary watch
+root lacked C sources, then subtest failures needed their parent test names).
+These were probe setup errors; the corrected probe passed. No install, service
+restart or CI change was performed. Diff review and whitespace checks passed.
+
+## Memory guard before merge
+
+Each guarded command used a 240-second timeout, ran alone, and was monitored
+for the required memory and swap limits. Measurements are MiB; waits and elapsed
+are seconds. Reports contain resource status only, not command output.
+
+| Command | Outcome | Wait | Admission | Final | Starting swap | Swap growth | Elapsed | Status |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Baseline probe: initial setup | started at once | 0.0 | 11129.7 | 11092.5 | 1136.0 | 0.0 | 0.2 | exit 1 |
+| Baseline probe: subtest setup | started at once | 0.0 | 11137.5 | 11130.1 | 1136.0 | 0.0 | 0.3 | exit 1 |
+| Baseline regression verification | started at once | 0.0 | 11106.5 | 11077.0 | 1133.7 | 0.0 | 0.3 | exit 0 |
+| `python3 -m unittest discover -s tests -v` | started at once | 0.0 | 11136.9 | 11072.4 | 1136.0 | -2.2 | 14.27 | exit 0 |
+| `ruff check .` | started at once | 0.0 | 11064.6 | 11071.8 | 1133.7 | 0.0 | 0.1 | exit 0 |
+| `ty check` | started at once | 0.0 | 11065.7 | 11101.2 | 1133.7 | 0.0 | 0.2 | exit 0 |
+
+[phone script]: ../../watchface/src/pkjs/index.js
+[watchface guide]: ../../watchface/README.md
+[Node fixture]: ../../tests/watch/phone.js
+[PhoneContractTests]: ../../tests/test_pebble_quota.py

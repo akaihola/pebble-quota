@@ -62,22 +62,39 @@ function quotaMessage(data) {
   return message;
 }
 
+// Only the latest refresh may forward data. Settings changes start a new
+// timestamp history; a collector clock reset can recover after one interval.
+var refreshSequence = 0;
+var currentEndpoint;
+var currentToken;
+var lastCollectedAt;
+var lastForwardedAt;
+
 function sendQuota(message) {
   var onSent = function () {
     console.log("Quota data sent");
   };
   var onFailed = function (error) {
-    console.log("AppMessage failed: " + JSON.stringify(error));
+    console.log("AppMessage failed; deferred until next refresh: " + JSON.stringify(error));
   };
   Pebble.sendAppMessage(message, onSent, onFailed);
 }
 
 function refresh() {
+  var sequence = ++refreshSequence;
+  var endpoint = setting("endpoint", DEFAULT_ENDPOINT);
+  var token = setting("token", DEFAULT_TOKEN);
+  if (endpoint !== currentEndpoint || token !== currentToken) {
+    lastCollectedAt = undefined;
+    currentEndpoint = endpoint;
+    currentToken = token;
+  }
   var request = new XMLHttpRequest();
-  request.open("GET", setting("endpoint", DEFAULT_ENDPOINT), true);
-  request.setRequestHeader("Authorization", "Bearer " + setting("token", DEFAULT_TOKEN));
+  request.open("GET", endpoint, true);
+  request.setRequestHeader("Authorization", "Bearer " + token);
   request.timeout = 15000;
   request.onload = function () {
+    if (sequence !== refreshSequence) return;
     if (request.status >= 200 && request.status < 300) {
       var message;
       try {
@@ -86,6 +103,18 @@ function refresh() {
         console.log("Rejected quota data: " + error.message);
         return;
       }
+      var now = Date.now();
+      var age = now - lastForwardedAt;
+      // Do not let a bad timestamp poison this generation indefinitely. Invalid
+      // or backward phone clocks also bypass the bounded timestamp comparison.
+      if (age >= 0 && age < REFRESH_MS && message.COLLECTED_AT < lastCollectedAt) {
+        console.log("Rejected older quota data");
+        return;
+      }
+      lastCollectedAt = message.COLLECTED_AT;
+      lastForwardedAt = now;
+      // No immediate retry: the next ready/watch/timer/settings refresh retries
+      // delivery with its own current response, including equal timestamps.
       sendQuota(message);
     } else {
       console.log("Quota HTTP status " + request.status);

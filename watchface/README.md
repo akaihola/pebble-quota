@@ -142,10 +142,19 @@ outage can prevent Settings from opening; it is not always reachable.
 
 The phone refreshes when ready, every 15 minutes, on a watch sync request, and
 after saving settings. HTTP requests time out after 15 seconds. Failures are
-logged; there is no immediate retry or ordering guard for overlapping responses.
-The watch requests a sync at startup and holds rows in memory only, so restarting
-the face offline starts without quota data. The [request ordering proposal]
-covers delayed responses overwriting newer settings or data.
+logged and leave the last valid display intact. Only the newest refresh can
+forward a response, even if it fails; a superseded request cannot restore older
+data. Changing endpoint or token resets the collector timestamp history.
+Decreasing timestamps are rejected for 15 minutes after the last forwarded
+response, without extending that window on rejection. Expiry or an invalid or
+backward phone clock permits recovery from a collector clock reset; malformed
+wire timestamps are still rejected. Equal timestamps can be sent again.
+
+AppMessage failures are explicitly deferred until the next ready, watch, timer
+or settings refresh, which fetches current data again. There is no immediate
+retry timer or message queue. The watch requests a sync at startup and holds
+rows in memory only, so restarting the face offline starts without quota data.
+See the [request ordering task] for the policy tests.
 
 ## Releases
 
@@ -175,7 +184,7 @@ settings; their reconciliation and upload-retry procedure remain in the
 [the Nix shell]: shell.nix
 [phone script]: src/pkjs/index.js
 [settings recovery proposal]: ../docs/tasks/6-remove-token-url-transport-and-make-settings-recoverable.md
-[request ordering proposal]: ../docs/tasks/14-prevent-older-phone-responses-from-overwriting-newer-settings-or-data.md
+[request ordering task]: ../docs/tasks/14-prevent-older-phone-responses-from-overwriting-newer-settings-or-data.md
 [the package manifest]: package.json
 [release configuration]: ../release-please-config.json
 [release manifest]: ../.release-please-manifest.json
