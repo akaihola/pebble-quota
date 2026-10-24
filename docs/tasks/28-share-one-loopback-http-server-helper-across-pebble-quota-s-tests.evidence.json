@@ -1,0 +1,83 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [28]",
+      "hai_id": "simple-0bb6aca7-46a4-4c35-8174-69d3d6348f30",
+      "title": "Share one loopback HTTP server helper across pebble-quota's tests",
+      "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-28-share-one-loopback-http-server-helper-across-pebble-quota-s-test-9ff0cb4b",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "a3fcb52f67d5eda57bc64f4659f321c8ccf4f3bd",
+      "delivery_commits": [
+        "b9e611816417567fca749a2fde75d122914da37c"
+      ],
+      "checks": [
+        {
+          "id": "focused",
+          "command": "PYTHONPATH=tests python3 -m unittest -v test_pebble_quota.HttpTests test_pebble_quota.ValidationTests.test_http_damaged_state_and_diagnostics_are_sanitized test_pebble_quota.StartupTests.test_busy_port_does_not_collect test_pebble_quota.WatchPipelineTests",
+          "dependencies": {}
+        },
+        {
+          "id": "offline-suite",
+          "command": "python3 -m unittest discover -s tests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "ruff",
+          "command": "ruff check .",
+          "dependencies": {}
+        },
+        {
+          "id": "ty",
+          "command": "ty check",
+          "dependencies": {}
+        }
+      ],
+      "evidence": {
+        "focused": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-28-share-one-loopback-http-server-helper-across-pebble-quota-s-test-9ff0cb4b",
+          "tested_commit": "b9e611816417567fca749a2fde75d122914da37c",
+          "dependencies": {},
+          "issue": "pebble-quota [28]",
+          "check": "focused",
+          "command": "PYTHONPATH=tests python3 -m unittest -v test_pebble_quota.HttpTests test_pebble_quota.ValidationTests.test_http_damaged_state_and_diagnostics_are_sanitized test_pebble_quota.StartupTests.test_busy_port_does_not_collect test_pebble_quota.WatchPipelineTests",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T21:55:24.023459+00:00"
+        },
+        "offline-suite": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-28-share-one-loopback-http-server-helper-across-pebble-quota-s-test-9ff0cb4b",
+          "tested_commit": "b9e611816417567fca749a2fde75d122914da37c",
+          "dependencies": {},
+          "issue": "pebble-quota [28]",
+          "check": "offline-suite",
+          "command": "python3 -m unittest discover -s tests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T21:55:40.858288+00:00"
+        },
+        "ruff": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-28-share-one-loopback-http-server-helper-across-pebble-quota-s-test-9ff0cb4b",
+          "tested_commit": "b9e611816417567fca749a2fde75d122914da37c",
+          "dependencies": {},
+          "issue": "pebble-quota [28]",
+          "check": "ruff",
+          "command": "ruff check .",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T21:55:44.818725+00:00"
+        },
+        "ty": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-28-share-one-loopback-http-server-helper-across-pebble-quota-s-test-9ff0cb4b",
+          "tested_commit": "b9e611816417567fca749a2fde75d122914da37c",
+          "dependencies": {},
+          "issue": "pebble-quota [28]",
+          "check": "ty",
+          "command": "ty check",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T21:55:45.219060+00:00"
+        }
+      }
+    }
+  ]
+}

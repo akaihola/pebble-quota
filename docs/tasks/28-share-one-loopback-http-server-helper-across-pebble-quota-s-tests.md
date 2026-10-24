@@ -62,3 +62,41 @@ host C compiler present; Ruff and ty passed. No service or provider access.
 - `python3 -m unittest discover -s tests -v`: started at once; wait 0.0 s; MemAvailable admission/final 58088/58083 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 14.24 s; exit 0.
 - `ruff check .`: started at once; wait 0.0 s; MemAvailable admission/final 58087/58094 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 0.2 s; exit 0.
 - `ty check`: started at once; wait 0.0 s; MemAvailable admission/final 58093/58092 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 0.2 s; exit 0.
+
+## Merged validation and delivery
+
+Base commit: `a3fcb52f67d5eda57bc64f4659f321c8ccf4f3bd`. Delivery commits, oldest first:
+
+- `b9e611816417567fca749a2fde75d122914da37c`
+
+All recorded checks ran from a clean detached checkout at the merged
+commit. The shared checkout remained on `main`. The repository is stdlib-only,
+with no lockfile or editable local checkout dependencies; declarations use `{}`.
+The [check receipt] contains the exact check commands and evidence.
+
+- **focused:** `PYTHONPATH=tests python3 -m unittest -v test_pebble_quota.HttpTests test_pebble_quota.ValidationTests.test_http_damaged_state_and_diagnostics_are_sanitized test_pebble_quota.StartupTests.test_busy_port_does_not_collect test_pebble_quota.WatchPipelineTests` — passed (exit 0). 14 tests, no skips.
+- **offline-suite:** `python3 -m unittest discover -s tests -v` — passed (exit 0). 106 tests, no skips.
+- **ruff:** `ruff check .` — passed (exit 0).
+- **ty:** `ty check` — passed (exit 0).
+
+The focused check covers both HTTP tests, damaged-state sanitization, the
+busy-port test and every pipeline test, including all five named scenarios.
+Node and the host C compiler were present, and the provider guard stayed on.
+
+## Memory reports for recording
+
+Each command below is the `uv run check-evidence.py record` invocation for
+the indicated check in the receipt. Logs and declaration stayed outside the
+clean checkout until recording finished. Only one heavy command ran at a time;
+each had a five-minute timeout and process-group cleanup.
+
+- **Record focused:** started at once; wait 0.0 s; MemAvailable admission/final 57995/58028 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 7.42 s; exit 0.
+- **Record offline-suite:** started at once; wait 0.0 s; MemAvailable admission/final 58043/58081 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 14.44 s; exit 0.
+- **Record ruff:** started at once; wait 0.0 s; MemAvailable admission/final 58082/58068 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 0.2 s; exit 0.
+- **Record ty:** started at once; wait 0.0 s; MemAvailable admission/final 58068/58089 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 0.4 s; exit 0.
+
+No failed, skipped or stopped checks; no remaining implementation work.
+Acceptance remains unchecked for steward review. The branch and worktree
+are retained. No deployment, device check or real provider request.
+
+[check receipt]: 28-share-one-loopback-http-server-helper-across-pebble-quota-s-tests.evidence.json
