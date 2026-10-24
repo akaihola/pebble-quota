@@ -39,3 +39,26 @@ directories; register the pipeline context after its mocks so LIFO cleanup
 stops the server first. Remove the unused `watch_now` argument. Preserve all
 assertions, provider guards, socket-only tests and tool fixtures. Run the named
 checks, the full offline suite, Ruff and ty, then review cleanup on failure.
+
+## Implementation and review
+
+One `loopback_server(snapshot, token)` context manager replaces all four
+lifecycles. `view()` always uses `self.now`; all callers take no arguments.
+The test source is 18 lines smaller. AST comparison confirmed every assertion
+is unchanged, as are `setUpModule`, `WatchTools` and `StartupTests`. Provider
+fixtures and access permissions are unchanged. No formatting-only changes.
+
+Reviewed the helper `finally`: shutdown, close and join (two-second timeout)
+run when a test assertion raises. The three HTTP contexts are inside their
+temporary directories. Pipeline `enterContext` registers cleanup after the
+mocks and temporary directory, so LIFO cleanup stops the server first,
+including after a setup or assertion failure.
+
+Pre-merge validation: 106 offline tests passed, no skips, with Node and the
+host C compiler present; Ruff and ty passed. No service or provider access.
+
+## Memory reports before merge
+
+- `python3 -m unittest discover -s tests -v`: started at once; wait 0.0 s; MemAvailable admission/final 58088/58083 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 14.24 s; exit 0.
+- `ruff check .`: started at once; wait 0.0 s; MemAvailable admission/final 58087/58094 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 0.2 s; exit 0.
+- `ty check`: started at once; wait 0.0 s; MemAvailable admission/final 58093/58092 MiB; starting swap 0 MiB, growth 0 MiB; elapsed 0.2 s; exit 0.

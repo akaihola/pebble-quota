@@ -414,27 +414,32 @@ class ClaudeBackoffTests(unittest.TestCase):
                               last_success_at=quota.iso_from_epoch(300)))
 
 
+@contextlib.contextmanager
+def loopback_server(snapshot: Path, token: str):
+    server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
+    server.snapshot, server.token = snapshot, token
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
 class HttpTests(unittest.TestCase):
     def test_config_page_served_without_auth(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
             output.write_text("{}")
-            server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
-            server.snapshot = output
-            server.token = "test-secret"
-            thread = threading.Thread(target=server.serve_forever, daemon=True)
-            thread.start()
-            url = f"http://127.0.0.1:{server.server_port}/config?endpoint=e&token=t"
-            try:
+            with loopback_server(output, "test-secret") as server:
+                url = f"http://127.0.0.1:{server.server_port}/config?endpoint=e&token=t"
                 with urllib.request.urlopen(url, timeout=2) as response:
                     self.assertEqual(response.status, 200)
                     self.assertIn("text/html", response.headers.get("Content-Type", ""))
                     body = response.read().decode()
                 self.assertIn("pebblejs://close#", body)
-            finally:
-                server.shutdown()
-                server.server_close()
-                thread.join(timeout=2)
 
     def test_watch_endpoint_requires_bearer_token(self) -> None:
         snapshot = {
@@ -444,13 +449,8 @@ class HttpTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
             output.write_text(json.dumps(snapshot))
-            server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
-            server.snapshot = output
-            server.token = "test-secret"
-            thread = threading.Thread(target=server.serve_forever, daemon=True)
-            thread.start()
-            url = f"http://127.0.0.1:{server.server_port}/v1/watch"
-            try:
+            with loopback_server(output, "test-secret") as server:
+                url = f"http://127.0.0.1:{server.server_port}/v1/watch"
                 with self.assertRaises(urllib.error.HTTPError) as denied:
                     urllib.request.urlopen(url, timeout=2)
                 self.assertEqual(denied.exception.code, 401)
@@ -470,10 +470,6 @@ class HttpTests(unittest.TestCase):
                     )
                 self.assertEqual(unknown.exception.code, 404)
                 unknown.exception.close()
-            finally:
-                server.shutdown()
-                server.server_close()
-                thread.join(timeout=2)
 
 
 class _FakeResponse:
@@ -1126,13 +1122,9 @@ class ValidationTests(unittest.TestCase):
     def test_http_damaged_state_and_diagnostics_are_sanitized(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "latest.json"
-            server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
-            server.snapshot, server.token = output, "fake"
-            thread = threading.Thread(target=server.serve_forever, daemon=True)
-            thread.start()
-            request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/watch",
-                                             headers={"Authorization": "Bearer fake"})
-            try:
+            with loopback_server(output, "fake") as server:
+                request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/v1/watch",
+                                                 headers={"Authorization": "Bearer fake"})
                 states = [
                     (None, "Quota unavailable"),
                     ("{secret", "JSONDecodeError"),
@@ -1197,10 +1189,6 @@ class ValidationTests(unittest.TestCase):
                             at = 42 if timestamp == 42 else 0
                             self.assertEqual(payload, {"v": 1, "at": at, "t": 222, "q": [
                                 dict(row, o=at) for row in expected_rows]})
-            finally:
-                server.shutdown()
-                server.server_close()
-                thread.join(timeout=2)
 
 
 class CodexResultTests(unittest.TestCase):
@@ -1563,13 +1551,7 @@ class WatchPipelineTests(WatchTools):
         self.enterContext(mock.patch.object(quota, "collect_codex", side_effect=self.codex))
         self.enterContext(mock.patch.object(
             quota, "collect_temperature", side_effect=lambda: self.temperature))
-        server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
-        server.snapshot, server.token = self.output, "test"
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        self.addCleanup(thread.join, 2)
-        self.addCleanup(server.server_close)
-        self.addCleanup(server.shutdown)
+        server = self.enterContext(loopback_server(self.output, "test"))
         self.url = f"http://127.0.0.1:{server.server_port}/v1/watch"
 
     def claude(self, *args: object, **kwargs: object) -> _FakeResponse:
@@ -1613,11 +1595,11 @@ class WatchPipelineTests(WatchTools):
                 error.close()
                 return {"status": error.code, "body": ""}
 
-    def view(self, watch_now: int | None = None) -> WatchView:
+    def view(self) -> WatchView:
         response = self.fetch()
         [message] = self.phone(response)
         return WatchView(json.loads(response["body"]), message,
-                         *self.watch(message, self.now if watch_now is None else watch_now))
+                         *self.watch(message, self.now))
 
     def test_healthy_claude_429_cooldown_and_recovery(self):
         self.refresh()
