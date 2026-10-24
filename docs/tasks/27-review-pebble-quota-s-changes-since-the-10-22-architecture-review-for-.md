@@ -63,3 +63,54 @@ checks needed no heavy command; the offline suite, Ruff and ty will be
 recorded at the merged commit with the memory guard.
 
 [simplification report]: ../reviews/2026-10-25-simplification-review.md
+
+## Merged verification, 2026-10-25
+
+The shared `main` fast-forwarded from `a1a8cc676daaae2f7a78be13fbccf5c715b42243` to
+`326b7dd0e38e3c1e59f2bd9ef39626e44a9fbe11`. The sole delivery commit is
+`326b7dd0e38e3c1e59f2bd9ef39626e44a9fbe11`; the feature branch and worktree are retained.
+The clean task checkout stayed at the merged commit throughout recording.
+No commit intervened between the merge and completion evidence preparation.
+
+The [check receipt] records four passing checks at that merged commit:
+
+- **Report:** `git diff --check` and the embedded Python document check passed.
+  Verified baseline, sections, 19 links and anchors, baseline citation bounds,
+  named existing tests, all 19 `view` calls, and unchanged application/tests.
+  Manual reading confirmed F1's callers, cleanup order and open-issue comparison.
+- **Unit:** `command -v node` and `command -v cc` succeeded, then
+  `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v` passed
+  all 106 tests in 14.009 seconds, with no skips. The suite's provider-access
+  guard was active, including its narrowly permitted synthetic host drivers.
+- **Lint:** `ruff check .` passed.
+- **Types:** `ty check` passed.
+
+No formatting correction was required. This repository has no dependency
+lockfile or editable local package dependencies; the checks use the standard
+library and installed tools, so dependency declarations are `{}`.
+No service restart, live provider request, implementation change or issue
+filing occurred. The report's draft remains for the steward; no owner decision
+is needed.
+
+## Memory reports for recorded checks
+
+Each row names a separate recorder invocation, run sequentially from the clean
+merged checkout with a 240-second timeout and process-group cleanup:
+
+```bash
+uv run "$EVIDENCE_RECORDER" record "$DECLARATION" 'pebble-quota [27]' <check-id>
+```
+
+The [check receipt] contains the exact recorder inputs and check commands.
+Admission required 2048 MiB available; monitoring every 0.1 seconds would stop
+at less than 1024 MiB or swap growth above 512 MiB. All commands completed;
+none needed the 1536 MiB fallback. Memory values are MiB and times are seconds.
+
+| Check ID | Outcome | Wait | Admission | Final | Starting swap | Swap growth | Elapsed | Status |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `report` | started at once | 0.00 | 57378.7 | 57362.8 | 0.2 | 0.0 | 0.20 | exit 0 |
+| `unittest` | started at once | 0.00 | 57364.1 | 57411.7 | 0.2 | 0.0 | 14.28 | exit 0 |
+| `ruff` | started at once | 0.00 | 57419.5 | 57411.7 | 0.2 | 0.0 | 0.10 | exit 0 |
+| `ty` | started at once | 0.00 | 57411.4 | 57383.6 | 0.2 | 0.0 | 0.30 | exit 0 |
+
+[check receipt]: 27-review-pebble-quota-s-changes-since-the-10-22-architecture-review-for-.evidence.json

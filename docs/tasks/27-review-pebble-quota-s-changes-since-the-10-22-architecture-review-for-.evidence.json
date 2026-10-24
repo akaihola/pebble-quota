@@ -1,0 +1,83 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [27]",
+      "hai_id": "simple-ecddbf13-895a-45b6-8a2f-c0d7d6dc6b1b",
+      "title": "Review pebble-quota's changes since the 10-22 architecture review for simplifications that keep behaviour",
+      "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-27-review-pebble-quota-s-changes-since-the-10-22-architecture-revie-75e68f26",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "a1a8cc676daaae2f7a78be13fbccf5c715b42243",
+      "delivery_commits": [
+        "326b7dd0e38e3c1e59f2bd9ef39626e44a9fbe11"
+      ],
+      "checks": [
+        {
+          "id": "report",
+          "command": "git diff --check a1a8cc676daaae2f7a78be13fbccf5c715b42243 HEAD && python3 - <<'PY'\nimport ast\nimport re\nimport subprocess\nfrom pathlib import Path\n\nbaseline = '3a963b0df7dc941ce80598082e0b6705b258718c'\nreport = Path('docs/reviews/2026-10-25-simplification-review.md')\ntext = report.read_text()\nassert baseline in text\nheadings = re.findall(r'^#{1,6} (.+)$', text, re.M)\nassert headings[-1] == 'Draft issues' and all(len(h) <= 60 for h in headings)\nassert 'Findings ranked by removal and risk' in headings\nfirst = text.split('## Do these first\\n')[1].split('\\n## ')[0]\nassert 1 <= len(re.findall(r'^- \\*\\*D\\d', first, re.M)) <= 3\nassert len(re.findall(r'^- \\*\\*F\\d', text, re.M)) == 1\nassert len(re.findall(r'^- \\*\\*D\\d', text.split('## Draft issues\\n')[1], re.M)) == 1\nassert not re.search(r'/home/|http://(?:hopeli|atom)/|\\.ts\\.net', text)\nlinks = dict(re.findall(r'^\\[([^\\]]+)\\]: (\\S+)$', text, re.M))\nfor label, url in links.items():\n    target, _, anchor = url.partition('#')\n    path = report.parent / target\n    assert path.is_file(), (label, target)\n    if anchor:\n        titles = re.findall(r'^#{1,6} (.+)$', path.read_text(), re.M)\n        slugs = [re.sub(r'[^\\w\\s-]', '', h).lower().replace(' ', '-') for h in titles]\n        assert anchor in slugs, (target, anchor)\nfor label, ref in re.findall(r'\\[([^\\]\\n]+)\\]\\[([^\\]]+)\\]', text):\n    assert ref in links, ref\n    if ':' not in label:\n        continue\n    source, ranges = label.split(':', 1)\n    body = subprocess.check_output(['git', 'show', f'{baseline}:{source}'], text=True)\n    assert body == Path(source).read_text(), source\n    for start, end in re.findall(r'(\\d+)(?:\u2013(\\d+))?', ranges):\n        assert 1 <= int(start) <= int(end or start) <= len(body.splitlines()), label\nmodule = ast.parse(Path('tests/test_pebble_quota.py').read_text())\nmethods = {f'{c.name}.{f.name}' for c in module.body if isinstance(c, ast.ClassDef)\n           for f in c.body if isinstance(f, ast.FunctionDef)}\nfor name in re.findall(r'`([A-Za-z]+Tests\\.test_\\w+)`', text):\n    assert name in methods, name\nfor name in re.findall(r'`(test_\\w+)`', text):\n    assert any(m.endswith('.' + name) for m in methods), name\ncalls = [n for n in ast.walk(module) if isinstance(n, ast.Call)\n         and isinstance(n.func, ast.Attribute) and n.func.attr == 'view']\nassert calls and all(not n.args and not n.keywords for n in calls)\nsubprocess.run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--', '.', ':!docs', ':!TASKS.md'], check=True)\nprint(f'Report checks passed: baseline, structure, {len(links)} links, citation ranges, named tests, {len(calls)} argument-free view calls, unchanged application and tests.')\nPY",
+          "dependencies": {}
+        },
+        {
+          "id": "unittest",
+          "command": "command -v node >/dev/null && command -v cc >/dev/null && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "ruff",
+          "command": "ruff check .",
+          "dependencies": {}
+        },
+        {
+          "id": "ty",
+          "command": "ty check",
+          "dependencies": {}
+        }
+      ],
+      "evidence": {
+        "report": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-27-review-pebble-quota-s-changes-since-the-10-22-architecture-revie-75e68f26",
+          "tested_commit": "326b7dd0e38e3c1e59f2bd9ef39626e44a9fbe11",
+          "dependencies": {},
+          "issue": "pebble-quota [27]",
+          "check": "report",
+          "command": "git diff --check a1a8cc676daaae2f7a78be13fbccf5c715b42243 HEAD && python3 - <<'PY'\nimport ast\nimport re\nimport subprocess\nfrom pathlib import Path\n\nbaseline = '3a963b0df7dc941ce80598082e0b6705b258718c'\nreport = Path('docs/reviews/2026-10-25-simplification-review.md')\ntext = report.read_text()\nassert baseline in text\nheadings = re.findall(r'^#{1,6} (.+)$', text, re.M)\nassert headings[-1] == 'Draft issues' and all(len(h) <= 60 for h in headings)\nassert 'Findings ranked by removal and risk' in headings\nfirst = text.split('## Do these first\\n')[1].split('\\n## ')[0]\nassert 1 <= len(re.findall(r'^- \\*\\*D\\d', first, re.M)) <= 3\nassert len(re.findall(r'^- \\*\\*F\\d', text, re.M)) == 1\nassert len(re.findall(r'^- \\*\\*D\\d', text.split('## Draft issues\\n')[1], re.M)) == 1\nassert not re.search(r'/home/|http://(?:hopeli|atom)/|\\.ts\\.net', text)\nlinks = dict(re.findall(r'^\\[([^\\]]+)\\]: (\\S+)$', text, re.M))\nfor label, url in links.items():\n    target, _, anchor = url.partition('#')\n    path = report.parent / target\n    assert path.is_file(), (label, target)\n    if anchor:\n        titles = re.findall(r'^#{1,6} (.+)$', path.read_text(), re.M)\n        slugs = [re.sub(r'[^\\w\\s-]', '', h).lower().replace(' ', '-') for h in titles]\n        assert anchor in slugs, (target, anchor)\nfor label, ref in re.findall(r'\\[([^\\]\\n]+)\\]\\[([^\\]]+)\\]', text):\n    assert ref in links, ref\n    if ':' not in label:\n        continue\n    source, ranges = label.split(':', 1)\n    body = subprocess.check_output(['git', 'show', f'{baseline}:{source}'], text=True)\n    assert body == Path(source).read_text(), source\n    for start, end in re.findall(r'(\\d+)(?:\u2013(\\d+))?', ranges):\n        assert 1 <= int(start) <= int(end or start) <= len(body.splitlines()), label\nmodule = ast.parse(Path('tests/test_pebble_quota.py').read_text())\nmethods = {f'{c.name}.{f.name}' for c in module.body if isinstance(c, ast.ClassDef)\n           for f in c.body if isinstance(f, ast.FunctionDef)}\nfor name in re.findall(r'`([A-Za-z]+Tests\\.test_\\w+)`', text):\n    assert name in methods, name\nfor name in re.findall(r'`(test_\\w+)`', text):\n    assert any(m.endswith('.' + name) for m in methods), name\ncalls = [n for n in ast.walk(module) if isinstance(n, ast.Call)\n         and isinstance(n.func, ast.Attribute) and n.func.attr == 'view']\nassert calls and all(not n.args and not n.keywords for n in calls)\nsubprocess.run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--', '.', ':!docs', ':!TASKS.md'], check=True)\nprint(f'Report checks passed: baseline, structure, {len(links)} links, citation ranges, named tests, {len(calls)} argument-free view calls, unchanged application and tests.')\nPY",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T21:15:46.392077+00:00"
+        },
+        "unittest": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-27-review-pebble-quota-s-changes-since-the-10-22-architecture-revie-75e68f26",
+          "tested_commit": "326b7dd0e38e3c1e59f2bd9ef39626e44a9fbe11",
+          "dependencies": {},
+          "issue": "pebble-quota [27]",
+          "check": "unittest",
+          "command": "command -v node >/dev/null && command -v cc >/dev/null && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T21:16:00.681902+00:00"
+        },
+        "ruff": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-27-review-pebble-quota-s-changes-since-the-10-22-architecture-revie-75e68f26",
+          "tested_commit": "326b7dd0e38e3c1e59f2bd9ef39626e44a9fbe11",
+          "dependencies": {},
+          "issue": "pebble-quota [27]",
+          "check": "ruff",
+          "command": "ruff check .",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T21:16:10.823716+00:00"
+        },
+        "ty": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-27-review-pebble-quota-s-changes-since-the-10-22-architecture-revie-75e68f26",
+          "tested_commit": "326b7dd0e38e3c1e59f2bd9ef39626e44a9fbe11",
+          "dependencies": {},
+          "issue": "pebble-quota [27]",
+          "check": "ty",
+          "command": "ty check",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T21:16:11.143882+00:00"
+        }
+      }
+    }
+  ]
+}
