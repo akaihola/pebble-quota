@@ -17,6 +17,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [29] Check pebble-quota's documents against the ten source changes since the
+  10-22 docs review
+  <!-- hai:{"id":"simple-01984467-4ebe-4ac4-bca6-f25d27f9ab34","labels":["steward","review"],"createdAt":"2026-10-24T23:50:27.223Z","updatedAt":"2026-10-24T23:50:27.223Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -115,7 +119,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,26,27,28 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,26,27,28,29 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -166,6 +170,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [27]: docs/tasks/27-review-pebble-quota-s-changes-since-the-10-22-architecture-review-for-.md
 
 [28]: docs/tasks/28-share-one-loopback-http-server-helper-across-pebble-quota-s-tests.md
+
+[29]: docs/tasks/29-check-pebble-quota-s-documents-against-the-ten-source-changes-since-th.md
 
 ## Rules
 
