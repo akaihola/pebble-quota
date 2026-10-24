@@ -28,3 +28,19 @@ Tracker: [TASKS.md](../../TASKS.md).
 [21]: 21-use-one-compact-payload-decision-for-http.md
 [24]: 24-remove-unused-collector-helper-generality.md
 [26]: 26-reject-zero-byte-watch-strings-before-replacing-rows.md
+
+## Review plan, 2026-10-25
+
+Review `main` at `3a963b0df7dc941ce80598082e0b6705b258718c`, against
+`61ebe07c4ba9e377f14980ceee761dcd284e68d1`. Read the freshness, five-row,
+zero-byte string and response-ordering commits first, then the combined diff.
+Trace each candidate through its callers and tests, preserving validation at
+each layer; compare candidates with open issues before drafting anything.
+
+Write the dated report with ranked, line-cited findings, at most three first
+actions and unfiled draft issues naming preservation checks. Review the report
+for accurate citations, relative links and absence of private paths. Run the
+documented offline suite, Ruff and ty with the network guard enabled and the
+required memory guard; change only this report and this issue's records.
+Rebase and merge, record checks from the clean merged commit, then complete
+the issue without marking user acceptance.
