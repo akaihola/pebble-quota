@@ -14,11 +14,6 @@ Rules for TASKS.md usage are at the bottom of the file.
 
   <!-- hai:{"id":"simple-ad8ce943-0ba8-4801-95c6-2ecbabd61806","labels":["steward"],"createdAt":"2026-10-19T12:35:46.689Z","updatedAt":"2026-10-19T12:35:47.652Z"} -->
 
-- [11] Enforce the five-row collector phone and watch contract
-    - Depends on: [8], [9]
-
-  <!-- hai:{"id":"simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106","labels":["steward"],"createdAt":"2026-10-19T12:35:36.920Z","updatedAt":"2026-10-19T12:35:36.920Z"} -->
-
 - [7] Gate releases on collector and phone behavior checks
   <!-- hai:{"id":"simple-0973cf3d-1685-468a-b2fe-aa6a52710543","labels":["steward"],"createdAt":"2026-10-19T12:35:35.717Z","updatedAt":"2026-10-19T12:35:35.717Z"} -->
 
@@ -26,6 +21,11 @@ Rules for TASKS.md usage are at the bottom of the file.
   <!-- hai:{"id":"simple-f5d94773-9467-431d-b527-2947873cdf46","labels":["steward"],"createdAt":"2026-10-19T12:35:35.429Z","updatedAt":"2026-10-19T12:35:35.429Z"} -->
 
 ## Ordered backlog
+
+- [11] Enforce the five-row collector phone and watch contract
+    - Depends on: [8], [9]
+
+  <!-- hai:{"id":"simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106","labels":["steward"],"createdAt":"2026-10-19T12:35:36.920Z","updatedAt":"2026-10-24T06:28:50.232Z"} -->
 
 ## Scheduled
 
