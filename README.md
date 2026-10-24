@@ -38,7 +38,9 @@ ty check
 ```
 
 The suite uses synthetic provider responses, fake subprocesses and loopback HTTP
-servers; it blocks real provider access. [Ruff] and [ty] run with their default
+servers; it blocks real provider access. Its watch pipeline tests run the phone
+script under Node and compile the watch's gauge rules with the host C compiler;
+they are skipped when `node` or `cc` is missing. [Ruff] and [ty] run with their default
 rules, without project configuration, and report no findings; a `noqa: BLE001`
 comment explains each deliberate broad `except`. CI currently builds and checks
 the watch bundle but runs neither the suite nor these checks. See the [task

@@ -492,7 +492,7 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
                 {"services": {name: collector()}})["services"].get(name, {})
             if not output["services"][name].get("windows"):
                 output["services"][name].setdefault("error", "Invalid quota windows")
-            if name == "claude" and output["services"][name].get("windows"):
+            if output["services"][name].get("windows"):
                 output["services"][name]["last_success_at"] = output["collected_at"]
         except Exception as exc:  # noqa: BLE001 - isolate providers; record, then collect the next
             service = {"service": name, "error": diagnostic(exc)}
@@ -529,10 +529,18 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
 def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any]:
     data = normalize_snapshot(data)
     now = int(time.time()) if now is None else now
+    at = epoch(data.get("collected_at"))
     rows = []
+    unavailable = ""
     service_codes = {"claude": "C", "codex": "X"}
     for service_name in ("claude", "codex"):
         service = data.get("services", {}).get(service_name, {})
+        if not service.get("windows"):
+            unavailable += service_codes[service_name]
+        # Retained rows keep their own reading time; the pass time is only a fallback.
+        observed = epoch(service.get("last_success_at"))
+        observed = at if observed is None else observed
+        failed = service.get("stale") is True or "error" in service
         for window_name, item in service.get("windows", {}).items():
             used = item["used_fraction"]
             reset = item["resets_at"]
@@ -540,15 +548,22 @@ def compact_watch(data: dict[str, Any], now: int | None = None) -> dict[str, Any
             code, name = service_codes[service_name], window_name
             if service_name == "claude" and window_name == "7d (Fable)":
                 code, name = "F", "7d"
-            rows.append({
+            row = {
                 "s": code,
                 "w": name,
                 "u": round(used * 100),
                 "r": reset,
                 "d": duration,
                 "p": pace_points(used, reset, duration, now),
-            })
-    result: dict[str, Any] = {"v": 1, "at": epoch(data.get("collected_at")), "q": rows[:5]}
+            }
+            if observed is not None:
+                row["o"] = observed
+            if failed:
+                row["e"] = 1
+            rows.append(row)
+    result: dict[str, Any] = {"v": 1, "at": at, "q": rows[:5]}
+    if unavailable:
+        result["n"] = unavailable  # providers without rows, e.g. after a failed Codex read
     if "temperature_c_tenths" in data:
         result["t"] = data["temperature_c_tenths"]  # outside temperature, integer tenths of degC
     return result

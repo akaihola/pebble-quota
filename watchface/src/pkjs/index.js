@@ -10,7 +10,13 @@ function setting(name, fallback) {
 
 function sendQuota(data) {
   var rows = (data.q || []).slice(0, 5);
-  var message = { COLLECTED_AT: data.at || 0, ROW_COUNT: rows.length };
+  var at = data.at || 0;
+  var message = {
+    COLLECTED_AT: at,
+    ROW_COUNT: rows.length,
+    // Providers without rows; an older collector omits it.
+    UNAVAILABLE: typeof data.n === "string" ? data.n : "",
+  };
   // Outside temperature in tenths of degC; only sent when the collector had it.
   if (typeof data.t === "number") message["TEMP"] = data.t;
   rows.forEach(function (row, index) {
@@ -19,7 +25,9 @@ function sendQuota(data) {
     message["U" + index] = row.u;
     message["R" + index] = row.r;
     message["D" + index] = row.d;
-    message["P" + index] = row.p;
+    // Each row's own reading time; an older collector sends only the pass time.
+    message["O" + index] = typeof row.o === "number" ? row.o : at;
+    message["E" + index] = row.e ? 1 : 0;
   });
   var onSent = function () {
     console.log("Quota data sent");

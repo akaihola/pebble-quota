@@ -4,9 +4,9 @@ Pebble Time 2 (`emery`) watch face for Claude Code and Codex subscription quotas
 
 The layout stacks three regions top to bottom:
 
-1. **Time:** a large black-on-white band. When the phone provides temperature,
-   it appears on the right in whole Celsius degrees, rounded to nearest with
-   ties away from zero (for example, `22°`).
+1. **Time:** a large black-on-white band. When the phone provides a fresh
+   temperature, it appears on the right in whole Celsius degrees, rounded to
+   nearest with ties away from zero (for example, `22°`).
 2. **Calendar:** a colored three-week calendar, Monday-first. Today sits in the
    middle week inside a white box; other weekends are red and adjacent-month
    days are dimmed.
@@ -14,16 +14,36 @@ The layout stacks three regions top to bottom:
    `Claude+Fable 7d`, `Codex 5h` and `Codex 7d`. Missing windows are not invented.
 
 Each gauge shows the service/window title, used quota over a light-gray remaining
-track, and a white, black-outlined elapsed-time marker. The first title row also
-shows `updated Nm ago` or `phone sync pending`; with no rows the face shows
-`Waiting for quota data`. Green means pace surplus is zero or positive, yellow
-means -10 through -1 points, and red means below -10.
+track, and a white, black-outlined elapsed-time marker. With no rows the face
+shows `Waiting for quota data`. The watch re-judges every row each minute
+against its own clock:
+
+- **Fresh:** the color comes from the current elapsed percentage minus the used
+  percentage, the same elapsed value that places the marker. Green means pace
+  surplus is zero or positive, yellow means -10 through -1 points, and red means
+  below -10.
+- **Stale:** the reading is more than 25 minutes old, its provider's latest
+  attempt failed, or it is more than 5 minutes in the future. The used part
+  turns dark gray, and the title row shows `stale 12m` (or hours, then days) or
+  `clock skew`.
+- **Reset:** the window has reset since the reading. The bar becomes an empty
+  dark track without a marker, and the title row shows `reset ?`.
+- **Unavailable:** a provider without rows gets its own line, for example
+  `Codex` with `unavailable`, over an empty dark track.
+
+The first title row shows `updated Nm ago` or `phone sync pending` while that
+gauge is fresh, and the gauge's own state otherwise. The temperature hides once
+its pass is more than 25 minutes old. Only a newer valid reading clears a stale
+state.
 
 When both Claude and Fable weekly rows exist, they share two bars separated by
 1 px and a single marker computed from Claude's row. Pairing assumes equal
-resets and durations but does not check them. Each bar retains its own received
-pace color. See [collector freshness] for timestamp meaning, temperature
-validation, marker/color timing and stale-data limitations.
+resets and durations but does not check them. Both bar colors use that shared
+elapsed value. See [collector freshness] for the policy, timestamp meaning,
+temperature validation, and rollout order.
+
+The rules live in [the gauge module], which has no Pebble dependency; the test
+suite compiles it on the host.
 
 ![Pebble Time 2 emulator screenshot][screenshot]
 
@@ -68,7 +88,9 @@ nix-shell --run 'xvfb-run -a sh -c "pebble install --emulator emery && sleep 3 &
 ```
 
 This path and the checked-in screenshot are historical evidence; the 2026-10-22
-source review did not run an emulator or device.
+source review did not run an emulator or device. On 2026-10-24 the
+[freshness change] was checked this way against synthetic loopback snapshots;
+its task record describes each capture.
 
 ## Install on a physical Pebble
 
@@ -135,7 +157,9 @@ The [release configuration] and [release manifest] are the source of versioning
 settings; their reconciliation and upload-retry procedure remain in the
 [operations proposal]. Collector deployment is outside this workflow.
 
-[collector freshness]: ../docs/collector.md#temperature-and-display-freshness
+[collector freshness]: ../docs/collector.md#display-freshness-policy
+[the gauge module]: src/c/gauges.c
+[freshness change]: ../docs/tasks/9-carry-freshness-and-failure-status-through-to-watch-rendering.md
 [screenshot]: quota-pace.png
 [watchface build recipe]: Makefile
 [CI workflow]: ../.github/workflows/build.yml

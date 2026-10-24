@@ -146,3 +146,137 @@ the watch bundle) and a rollback that preserves timestamps.
 
 [the collector reference]: ../collector.md
 [the watchface guide]: ../../watchface/README.md
+
+## Implementation and verification
+
+Implemented on 2026-10-24 as planned. No collector restart, deployment, phone
+install or on-device check was done.
+
+- **Collector** ([collector]): both providers record `last_success_at` on
+  success. `compact_watch()` adds row `o` (that time, or `at`), row `e: 1` when
+  the service has `stale` or `error`, and top-level `n` for providers without
+  windows. `p`, `at` and the other version 1 fields are unchanged, and no
+  error text reaches the payload. A failed Codex pass still leaves `error`
+  without `windows` in the snapshot.
+- **Phone** ([phone script]): sends `O<i>` (`at` when `o` is missing), `E<i>`
+  and `UNAVAILABLE`. It no longer sends `P<i>`, and [the package manifest]
+  swaps those keys for the new ones.
+- **Watch:** [the gauge module] holds the policy without Pebble headers:
+  elapsed percentage, row state, status text, gauge plan and temperature
+  visibility. [The watch app] draws that plan. The plan lives in a static array
+  because seven gauges (about 500 bytes) are too much for the draw callback's
+  stack.
+- **Docs:** [the collector reference] gains the new fields, the display
+  freshness policy and the rollout and rollback order. [The watchface guide]
+  describes each state, and [the README] names the Node and C compiler
+  prerequisites of the pipeline tests.
+
+[The tests] gain `CompactFreshnessTests` (three tests) and
+`WatchPipelineTests` (eight end-to-end tests). In the pipeline tests, fake
+providers and a fake clock drive `refresh_snapshot()`. The loopback
+`/v1/watch` response goes through the real phone script under Node
+([phone harness]), and the message it sends goes through the gauge module
+compiled on the host with `-std=c99 -Wall -Wextra -Werror -pedantic`
+([watch driver]). The scenarios:
+
+- Healthy; a Claude 429 that turns Claude stale at once, stays stale through
+  the cooldown and clears only on the next valid reading.
+- Codex failing (`Codex` unavailable), then both failing, then recovery.
+- The whole-snapshot fallback, where retained Codex rows keep their own
+  reading time and `e`.
+- An old snapshot served at startup (`stale 2h`, then `reset ?` at reset), and
+  a recent reading whose window resets (fresh at +599 s, `reset ?` without a
+  marker at +600 s, while `p` keeps its version 1 value of 80 for old watches).
+- An offline phone: fresh at the 25-minute boundary and stale with the
+  temperature hidden a minute later. Failed and 503 requests send nothing.
+- Future timestamps (301 s ahead is `clock skew` with the temperature hidden;
+  299 s ahead is fresh), and a missing temperature.
+- Colour following the marker across the -11/-10 and -1/0 pace boundaries.
+
+The existing tests needed only the additive `o`, `n` and Codex
+`last_success_at` in their expected values.
+
+### Checks before the merge
+
+- `python3 -m unittest discover -s tests -v`: 86 tests pass, none skipped (75
+  existing and 11 new).
+- `ruff check .` and `ty check`: no findings.
+- `make clean build` in `watchface`: the bundle builds with SDK 4.17. The
+  compiler warns that the temperature `snprintf` may truncate. That statement
+  is unchanged apart from a variable rename. The linker's RWX segment notice
+  comes from the SDK.
+- `git diff --check`: clean.
+
+### Emery emulator captures
+
+The emulator ran headless under `xvfb-run` inside [the Nix shell], against a
+temporary copy of the bundle. Its only change pointed the phone script's
+default endpoint at a loopback server. That server served synthetic snapshots
+through the collector's `Handler`, with no refresher and no provider access.
+Every timestamp was relative to the capture time. The captures were taken
+twice, and the second pass, on the final code, showed the same as the first.
+
+- **Healthy:** clock, 22° and the three-week calendar. `Claude 5h` is green at
+  20% with the marker at 20% and `updated 0m ago`. `Claude+Fable 7d` has a
+  green 40% bar and a red 70% bar under one marker at 50%. `Codex 5h` is
+  yellow at 45% with the marker at 40%, and `Codex 7d` is green at 10%.
+- **Partial failure** (Claude kept 40 minutes after a 429, Codex failed):
+  `Claude 5h` and `Claude+Fable 7d` show dark-gray used bars with their markers
+  and `stale 40m`. `Codex` shows `unavailable` over an empty dark track. The
+  temperature stays, because the pass is current.
+- **Reset and skew** (Claude 5h reset a minute earlier, Codex readings 10
+  minutes ahead): `Claude 5h` shows `reset ?` over an empty dark track with no
+  marker. `Claude+Fable 7d` stays fresh, green and red. Both Codex gauges show
+  dark-gray bars and `clock skew`.
+- **Offline** (everything 30 minutes old): every gauge shows a dark-gray bar
+  and `stale 30m`. The temperature is gone and the time is centred across the
+  band. The clock and calendar still draw.
+
+Not verified: a physical watch or phone, and the deployed collector. Both
+belong to the owner's install and the steward's restart.
+
+### Remaining gaps for the steward
+
+- Watches with the old bundle keep the old behaviour (colour from `p`, no stale
+  or reset states) until the new bundle is installed after the collector.
+- Six gauges are possible only when Claude is unavailable and Codex reports
+  five windows. They would crowd the 92-pixel pace area. Row selection belongs
+  to [the five-row contract task].
+- Claude/Fable pairing still does not check that the resets match; also
+  [the five-row contract task].
+
+### Guarded command resource record
+
+Memory readings are in MiB. Each guarded command ran alone through a wrapper
+that waited for 2,048 MiB available (10-minute limit, 1,536 MiB fallback). It
+stopped the command below 1,024 MiB available or after 512 MiB of swap growth.
+
+- Full suite, first run (`python3 -m unittest discover -s tests`): **started
+  at once**; wait 0 s; admission 10050, final 9971; starting swap 842, growth
+  0; 11 s; exit 0.
+- Emulator captures, first pass (`nix-shell watchface/shell.nix --run
+  'xvfb-run -a sh <capture script>'`): **started at once**; wait 0 s;
+  admission 9661, final 9945; starting swap 842, growth 10; 56 s; exit 0.
+- Full suite, final run (`python3 -m unittest discover -s tests -v`):
+  **started at once**; wait 0 s; admission 10242, final 10145; starting swap
+  852, growth 0; 11 s; exit 0.
+- Emulator captures, second pass (same command): **started at once**; wait 0
+  s; admission 10061, final 9413; starting swap 852, growth −3; 55 s; exit 0.
+
+The Pebble builds (`make clean build`, five runs, the first of which the
+sandbox stopped) ran without the wrapper, under a 300-second timeout. Each
+finished in about a second while the readings around them showed over 9,000
+MiB available. Ruff, ty, focused test runs and host compiles ran unguarded;
+each takes seconds.
+
+[collector]: ../../collector/pebble_quota.py
+[phone script]: ../../watchface/src/pkjs/index.js
+[the package manifest]: ../../watchface/package.json
+[the gauge module]: ../../watchface/src/c/gauges.c
+[The watch app]: ../../watchface/src/c/watchface.c
+[the README]: ../../README.md
+[The tests]: ../../tests/test_pebble_quota.py
+[phone harness]: ../../tests/watch/phone.js
+[watch driver]: ../../tests/watch/gauges_main.c
+[the Nix shell]: ../../watchface/shell.nix
+[the five-row contract task]: 11-enforce-the-five-row-collector-phone-and-watch-contract.md

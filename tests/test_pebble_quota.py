@@ -18,7 +18,7 @@ import urllib.error
 import urllib.request
 from email.message import Message
 from pathlib import Path
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, NamedTuple, Self
 from unittest import mock
 
 MODULE_PATH = Path(__file__).parents[1] / "collector/pebble_quota.py"
@@ -139,8 +139,8 @@ class CompactTests(unittest.TestCase):
         self.assertEqual(result["v"], 1)
         self.assertEqual(result["at"], 900)
         self.assertEqual(result["q"], [
-            {"s": "C", "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30},
-            {"s": "X", "w": "7d", "u": 80, "r": 1000, "d": 100, "p": -30},
+            {"s": "C", "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30, "o": 900},
+            {"s": "X", "w": "7d", "u": 80, "r": 1000, "d": 100, "p": -30, "o": 900},
         ])
 
     def test_skips_incomplete_windows(self) -> None:
@@ -251,7 +251,7 @@ class UnavailableMergeTests(unittest.TestCase):
         merged = quota.merge_unavailable_snapshot({"services": {}}, attempted)
         self.assertEqual(merged, {"services": attempted["services"]})
         self.assertFalse(quota.has_quota_data(merged))
-        self.assertEqual(quota.compact_watch(merged, now=300), {"v": 1, "at": None, "q": []})
+        self.assertEqual(quota.compact_watch(merged, now=300), {"v": 1, "at": None, "q": [], "n": "CX"})
 
 
 class ClaudeBackoffTests(unittest.TestCase):
@@ -409,7 +409,8 @@ class ClaudeBackoffTests(unittest.TestCase):
         self.refresh()
         self.http.assert_not_called()
         self.assertEqual(json.loads(self.output.read_text())["services"]["codex"],
-                         dict(self.codex.return_value, last_attempt_at=quota.iso_from_epoch(300)))
+                         dict(self.codex.return_value, last_attempt_at=quota.iso_from_epoch(300),
+                              last_success_at=quota.iso_from_epoch(300)))
 
 
 class HttpTests(unittest.TestCase):
@@ -1079,9 +1080,11 @@ class ValidationTests(unittest.TestCase):
                 saved = json.loads(output.read_text())
                 self.assertEqual(saved, {"collected_at": quota.iso_from_epoch(at), "services": services,
                                          "temperature_c_tenths": tenths})
-                code = "C" if name == "claude" else "X"
+                code, missing = ("C", "X") if name == "claude" else ("X", "C")
+                # Retained rows keep their original reading time and are marked failed.
                 self.assertEqual(quota.compact_watch(saved, now=950), {"v": 1, "at": at, "q": [
-                    {"s": code, "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30}], "t": tenths})
+                    {"s": code, "w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30, "o": 0, "e": 1}],
+                    "n": missing, "t": tenths})
 
     def test_first_429_without_rows_is_unavailable_but_survives_restart(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1189,8 +1192,9 @@ class ValidationTests(unittest.TestCase):
                                 self.assertEqual(response.headers["Content-Type"], "application/json")
                                 self.assertEqual(response.headers["Cache-Control"], "no-store")
                                 payload = json.load(response)
-                            self.assertEqual(payload, {"v": 1, "at": 42 if timestamp == 42 else 0,
-                                                       "q": expected_rows, "t": 222})
+                            at = 42 if timestamp == 42 else 0
+                            self.assertEqual(payload, {"v": 1, "at": at, "t": 222, "q": [
+                                dict(row, o=at) for row in expected_rows]})
             finally:
                 server.shutdown()
                 server.server_close()
@@ -1414,3 +1418,352 @@ class CodexRPCTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CompactFreshnessTests(unittest.TestCase):
+    WINDOWS: ClassVar[dict[str, Any]] = {"5h": {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}}
+
+    def test_rows_carry_their_own_reading_time_and_failure_without_detail(self):
+        snapshot = {"collected_at": quota.iso_from_epoch(300), "temperature_c_tenths": 215, "services": {
+            "claude": {"windows": self.WINDOWS, "last_success_at": quota.iso_from_epoch(100),
+                       "stale": True, "error": "HTTPError", "age_seconds": 200},
+            "codex": {"windows": self.WINDOWS, "last_success_at": quota.iso_from_epoch(250)},
+        }}
+        payload = quota.compact_watch(snapshot, now=950)
+        old_row = {"w": "5h", "u": 20, "r": 1000, "d": 100, "p": 30}
+        self.assertEqual(payload, {"v": 1, "at": 300, "t": 215, "q": [
+            dict(old_row, s="C", o=100, e=1), dict(old_row, s="X", o=250)]})
+        self.assertNotIn("HTTPError", json.dumps(payload))
+
+    def test_missing_reading_time_falls_back_to_the_pass(self):
+        snapshot = {"collected_at": quota.iso_from_epoch(300), "services": {
+            "codex": {"windows": self.WINDOWS}}}
+        payload = quota.compact_watch(snapshot, now=950)
+        self.assertEqual([row["o"] for row in payload["q"]], [300])
+        self.assertNotIn("e", payload["q"][0])
+        self.assertEqual(payload["n"], "C")
+
+    def test_codex_failure_keeps_snapshot_semantics_and_marks_it_unavailable(self):
+        window = {"used_fraction": 0.2, "resets_at": 1000, "duration_seconds": 100}
+        with mock.patch.object(quota, "utc_iso", return_value=quota.iso_from_epoch(300)), \
+             mock.patch.object(quota, "collect_claude", return_value={"windows": {"5h": window}}), \
+             mock.patch.object(quota, "collect_codex", return_value={"windows": {"5h": window}}), \
+             mock.patch.object(quota, "collect_temperature", return_value=None):
+            good = quota.collect_all()
+        self.assertEqual(good["services"]["codex"]["last_success_at"], quota.iso_from_epoch(300))
+        with mock.patch.object(quota, "utc_iso", return_value=quota.iso_from_epoch(600)), \
+             mock.patch.object(quota, "collect_claude", return_value={"windows": {"5h": window}}), \
+             mock.patch.object(quota, "collect_codex", side_effect=quota.CodexError(
+                 "Codex rate limits: response timeout")), \
+             mock.patch.object(quota, "collect_temperature", return_value=None):
+            failed = quota.collect_all(good)
+        # latest.json readers still see a failed Codex pass as error without windows.
+        self.assertEqual(failed["services"]["codex"], {
+            "service": "codex", "error": "Codex rate limits: response timeout",
+            "last_attempt_at": quota.iso_from_epoch(600)})
+        payload = quota.compact_watch(failed, now=600)
+        self.assertEqual(payload["n"], "X")
+        self.assertNotIn("timeout", json.dumps(payload))
+
+
+class WatchView(NamedTuple):
+    payload: dict[str, Any]
+    message: dict[str, Any]
+    temperature: str
+    gauges: list[tuple]
+
+
+class WatchPipelineTests(unittest.TestCase):
+    """Fake providers -> snapshot -> /v1/watch -> phone script (Node) -> watch rules (host C)."""
+
+    T0 = 1_800_000_000
+    WATCHFACE = Path(__file__).parents[1] / "watchface"
+    HARNESS = Path(__file__).parent / "watch"
+    HEALTHY: ClassVar[list[tuple]] = [
+        ("Claude 5h", "updated 0m ago", "green", "-", 1, 20),
+        ("Claude+Fable 7d", "", "green", "red", 1, 50),
+        ("Codex 5h", "", "yellow", "-", 1, 40),
+        ("Codex 7d", "", "green", "-", 1, 10),
+    ]
+    node: ClassVar[str]
+    driver: ClassVar[Path]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        node, cc = shutil.which("node", path=_TOOL_PATH), shutil.which("cc", path=_TOOL_PATH)
+        if not node or not cc:
+            raise unittest.SkipTest("needs node and a C compiler on PATH")
+        cls.node = node
+        cls.driver = Path(cls.enterClassContext(tempfile.TemporaryDirectory())) / "gauges"
+        source = cls.WATCHFACE / "src/c"
+        with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
+            subprocess.run([cc, "-std=c99", "-Wall", "-Wextra", "-Werror", "-pedantic", "-I", str(source),
+                            str(source / "gauges.c"), str(cls.HARNESS / "gauges_main.c"),
+                            "-o", str(cls.driver)], check=True, capture_output=True,
+                           env={"PATH": _TOOL_PATH})
+
+    def setUp(self) -> None:
+        home = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        credentials = home / ".claude/.credentials.json"
+        credentials.parent.mkdir()
+        credentials.write_text(json.dumps({"claudeAiOauth": {"accessToken": "test"}}))
+        self.enterContext(mock.patch.object(quota.Path, "home", return_value=home))
+        self.output = home / "latest.json"
+        self.now = self.T0
+        self.session_percent, self.session_reset = 20, self.T0 + 14_400
+        self.claude_error: Exception | None = None
+        self.codex_error: Exception | None = None
+        self.temperature: int | None = 215
+        self.enterContext(mock.patch.object(
+            quota, "utc_iso", side_effect=lambda: quota.iso_from_epoch(self.now)))
+        self.enterContext(mock.patch.object(quota, "provider_urlopen", side_effect=self.claude))
+        self.enterContext(mock.patch.object(quota, "collect_codex", side_effect=self.codex))
+        self.enterContext(mock.patch.object(
+            quota, "collect_temperature", side_effect=lambda: self.temperature))
+        server = quota.QuotaServer(("127.0.0.1", 0), quota.Handler)
+        server.snapshot, server.token = self.output, "test"
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(thread.join, 2)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        self.url = f"http://127.0.0.1:{server.server_port}/v1/watch"
+
+    def claude(self, *args: object, **kwargs: object) -> _FakeResponse:
+        if self.claude_error:
+            raise self.claude_error
+        weekly_reset = quota.iso_from_epoch(self.T0 + 302_400)
+        return _FakeResponse({"limits": [
+            {"kind": "session", "percent": self.session_percent,
+             "resets_at": quota.iso_from_epoch(self.session_reset), "scope": None},
+            {"kind": "weekly_all", "percent": 40, "resets_at": weekly_reset, "scope": None},
+            {"kind": "weekly_scoped", "percent": 70, "resets_at": weekly_reset,
+             "scope": {"model": {"display_name": "Fable"}}},
+        ]})
+
+    def codex(self) -> dict[str, Any]:
+        if self.codex_error:
+            raise self.codex_error
+        return {"service": "codex", "windows": {
+            "5h": {"used_fraction": 0.45, "resets_at": self.T0 + 10_800, "duration_seconds": 18_000},
+            "7d": {"used_fraction": 0.1, "resets_at": self.T0 + 544_320, "duration_seconds": 604_800},
+        }}
+
+    def claude_429(self) -> None:
+        headers = Message()
+        headers["Retry-After"] = "1200"
+        self.claude_error = urllib.error.HTTPError(
+            "https://api.anthropic.com/api/oauth/usage", 429, "Too Many Requests", headers, None)
+
+    def refresh(self) -> None:
+        quota.refresh_snapshot(self.output)
+
+    def fetch(self) -> dict[str, Any]:
+        request = urllib.request.Request(self.url, headers={"Authorization": "Bearer test"})
+        with mock.patch.object(quota.time, "time", return_value=self.now), \
+             mock.patch.object(quota.sys, "stderr", new_callable=io.StringIO):
+            try:
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    return {"status": response.status, "body": response.read().decode()}
+            except urllib.error.HTTPError as error:
+                error.close()
+                return {"status": error.code, "body": ""}
+
+    def phone(self, response: dict[str, Any]) -> list[dict[str, Any]]:
+        with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
+            result = subprocess.run(
+                [self.node, str(self.HARNESS / "phone.js"), str(self.WATCHFACE / "src/pkjs/index.js")],
+                input=json.dumps(response), capture_output=True, text=True, check=True,
+                env={"PATH": _TOOL_PATH})
+        return json.loads(result.stdout)
+
+    def watch(self, message: dict[str, Any], now: int) -> tuple[str, list[tuple]]:
+        args = [str(now), str(message["COLLECTED_AT"]), "1" if "TEMP" in message else "0",
+                message["UNAVAILABLE"]]
+        for index in range(message["ROW_COUNT"]):
+            args += [str(message[f"{key}{index}"]) for key in "SWURDOE"]
+        with mock.patch.object(subprocess, "Popen", _REAL_POPEN):
+            result = subprocess.run([str(self.driver), *args], capture_output=True, text=True,
+                                    check=True, env={})
+        temperature, *lines = result.stdout.splitlines()
+        gauges = []
+        for line in lines:
+            title, status, first, second, marker, elapsed = line.split("\t")
+            gauges.append((title, status, first, second, int(marker), int(elapsed)))
+        return temperature, gauges
+
+    def view(self, watch_now: int | None = None) -> WatchView:
+        response = self.fetch()
+        [message] = self.phone(response)
+        return WatchView(json.loads(response["body"]), message,
+                         *self.watch(message, self.now if watch_now is None else watch_now))
+
+    def test_healthy_claude_429_cooldown_and_recovery(self):
+        self.refresh()
+        view = self.view()
+        self.assertEqual((view.temperature, view.gauges), ("shown", self.HEALTHY))
+        self.assertNotIn("n", view.payload)
+        self.assertEqual(view.message["UNAVAILABLE"], "")
+        self.assertEqual({view.message[f"O{index}"] for index in range(5)}, {self.T0})
+        self.assertEqual({view.message[f"E{index}"] for index in range(5)}, {0})
+        # A 429 keeps Claude's rows with their original reading time; they turn stale at once.
+        self.now = self.T0 + 300
+        self.claude_429()
+        self.refresh()
+        view = self.view()
+        self.assertEqual(view.gauges, [
+            ("Claude 5h", "stale 5m", "stale", "-", 1, 22),
+            ("Claude+Fable 7d", "stale 5m", "stale", "stale", 1, 51),
+            ("Codex 5h", "", "yellow", "-", 1, 42),
+            ("Codex 7d", "", "green", "-", 1, 11),
+        ])
+        self.assertEqual([(row["o"], row.get("e")) for row in view.payload["q"]],
+                         [(self.T0, 1)] * 3 + [(self.T0 + 300, None)] * 2)
+        self.assertEqual(json.loads(self.output.read_text())["services"]["claude"]["error"], "HTTPError")
+        self.assertNotIn("HTTPError", json.dumps(view.payload))
+        # During the cooldown nothing clears the stale state.
+        self.now = self.T0 + 600
+        self.refresh()
+        self.assertEqual([gauge[1] for gauge in self.view().gauges], ["stale 10m", "stale 10m", "", ""])
+        # Only a valid reading clears it.
+        self.now = self.T0 + 1500
+        self.claude_error = None
+        self.refresh()
+        view = self.view()
+        self.assertEqual([gauge[:4] for gauge in view.gauges], [
+            ("Claude 5h", "updated 0m ago", "green", "-"),
+            ("Claude+Fable 7d", "", "green", "red"),
+            ("Codex 5h", "", "green", "-"),
+            ("Codex 7d", "", "green", "-"),
+        ])
+        self.assertEqual({row["o"] for row in view.payload["q"]}, {self.T0 + 1500})
+        self.assertFalse(any("e" in row for row in view.payload["q"]))
+
+    def test_codex_failure_shows_unavailable_then_both_failed_then_recovery(self):
+        self.refresh()
+        self.now = self.T0 + 300
+        self.codex_error = quota.CodexError("Codex rate limits: response timeout")
+        self.refresh()
+        view = self.view()
+        self.assertEqual(view.payload["n"], "X")
+        self.assertNotIn("timeout", json.dumps(view.payload))
+        self.assertEqual(view.gauges, [
+            ("Claude 5h", "updated 0m ago", "green", "-", 1, 22),
+            ("Claude+Fable 7d", "", "green", "red", 1, 51),
+            ("Codex", "unavailable", "unavailable", "-", 0, 0),
+        ])
+        self.now = self.T0 + 600
+        self.claude_429()
+        self.refresh()
+        self.assertEqual([gauge[:4] for gauge in self.view().gauges], [
+            ("Claude 5h", "stale 5m", "stale", "-"),  # its last good reading was at +300
+            ("Claude+Fable 7d", "stale 5m", "stale", "stale"),
+            ("Codex", "unavailable", "unavailable", "-"),
+        ])
+        self.now = self.T0 + 1800
+        self.claude_error = self.codex_error = None
+        self.refresh()
+        view = self.view()
+        self.assertNotIn("n", view.payload)
+        self.assertEqual([gauge[1] for gauge in view.gauges], ["updated 0m ago", "", "", ""])
+
+    def test_whole_snapshot_fallback_keeps_codex_reading_time(self):
+        self.claude_429()
+        self.refresh()
+        view = self.view()
+        self.assertEqual(view.payload["n"], "C")
+        self.assertEqual([gauge[:3] for gauge in view.gauges], [
+            ("Codex 5h", "updated 0m ago", "yellow"), ("Codex 7d", "", "green"),
+            ("Claude", "unavailable", "unavailable")])
+        self.now = self.T0 + 300
+        self.codex_error = RuntimeError("offline")
+        with self.assertRaisesRegex(RuntimeError, "preserving previous"):
+            self.refresh()
+        view = self.view()
+        self.assertEqual(view.payload["at"], self.T0)
+        self.assertEqual([(row["o"], row["e"]) for row in view.payload["q"]], [(self.T0, 1)] * 2)
+        self.assertEqual([gauge[:3] for gauge in view.gauges], [
+            ("Codex 5h", "stale 5m", "stale"), ("Codex 7d", "stale 5m", "stale"),
+            ("Claude", "unavailable", "unavailable")])
+        self.assertEqual(view.temperature, "shown")  # the retained pass is five minutes old
+
+    def test_old_snapshot_at_startup_ages_then_expires(self):
+        self.refresh()
+        # A restarted collector serves the old file before its first pass finishes.
+        self.now = self.T0 + 7200
+        view = self.view()
+        self.assertEqual(view.temperature, "hidden")
+        self.assertEqual([gauge[1:4] for gauge in view.gauges], [
+            ("stale 2h", "stale", "-"), ("stale 2h", "stale", "stale"),
+            ("stale 2h", "stale", "-"), ("stale 2h", "stale", "-")])
+        self.now = self.T0 + 14_400
+        self.assertEqual([gauge[:5] for gauge in self.view().gauges], [
+            ("Claude 5h", "reset ?", "expired", "-", 0),
+            ("Claude+Fable 7d", "stale 4h", "stale", "stale", 1),
+            ("Codex 5h", "reset ?", "expired", "-", 0),
+            ("Codex 7d", "stale 4h", "stale", "-", 1),
+        ])
+
+    def test_reset_crossing_hides_old_usage_even_when_recent(self):
+        self.session_reset = self.T0 + 600
+        self.refresh()
+        view = self.view()
+        self.assertEqual(view.gauges[0][:3], ("Claude 5h", "updated 0m ago", "green"))
+        self.assertEqual(self.watch(view.message, self.T0 + 599)[1][0][:3],
+                         ("Claude 5h", "updated 9m ago", "green"))
+        self.assertEqual(self.watch(view.message, self.T0 + 600)[1][0],
+                         ("Claude 5h", "reset ?", "expired", "-", 0, 100))
+        # Old watches still receive p with its v1 meaning, recomputed at read time.
+        self.now = self.T0 + 600
+        self.assertEqual(self.view().payload["q"][0]["p"], 80)
+
+    def test_offline_phone_ages_rows_and_temperature(self):
+        self.refresh()
+        message = self.view().message
+        temperature, gauges = self.watch(message, self.T0 + 1500)
+        self.assertEqual(temperature, "shown")
+        self.assertEqual(gauges[0], ("Claude 5h", "updated 25m ago", "green", "-", 1, 29))
+        self.assertNotIn("stale", {gauge[2] for gauge in gauges})
+        temperature, gauges = self.watch(message, self.T0 + 1560)
+        self.assertEqual(temperature, "hidden")
+        self.assertEqual({gauge[1] for gauge in gauges}, {"stale 26m"})
+        self.assertEqual({gauge[2] for gauge in gauges}, {"stale"})
+        # Failed requests send nothing, so the watch keeps aging what it has.
+        self.assertEqual(self.phone({"error": True}), [])
+        self.assertEqual(self.phone({"status": 503, "body": ""}), [])
+        self.output.write_text("{}")
+        self.assertEqual(self.fetch()["status"], 503)
+
+    def test_future_timestamps_beyond_the_skew_are_not_fresh(self):
+        future = self.T0 + 301
+        windows = {"5h": {"used_fraction": 0.2, "resets_at": self.T0 + 14_400, "duration_seconds": 18_000}}
+        quota.write_snapshot({"collected_at": quota.iso_from_epoch(future), "temperature_c_tenths": 215,
+                              "services": {
+            "claude": {"windows": windows, "last_success_at": quota.iso_from_epoch(future)},
+            "codex": {"windows": windows, "last_success_at": quota.iso_from_epoch(self.T0 + 299)},
+        }}, self.output)
+        view = self.view()
+        self.assertEqual(view.temperature, "hidden")
+        self.assertEqual(view.gauges, [("Claude 5h", "clock skew", "stale", "-", 1, 20),
+                                       ("Codex 5h", "", "green", "-", 1, 20)])
+        self.assertEqual(self.watch(view.message, self.T0 + 1),
+                         ("shown", [("Claude 5h", "updated 0m ago", "green", "-", 1, 21),
+                                    ("Codex 5h", "", "green", "-", 1, 21)]))
+
+    def test_missing_temperature_and_colour_follows_the_marker(self):
+        self.temperature = None
+        self.session_percent = 31
+        self.refresh()
+        view = self.view()
+        self.assertNotIn("t", view.payload)
+        self.assertNotIn("TEMP", view.message)
+        self.assertEqual(view.temperature, "hidden")
+        # Same message, later watch times: colour changes exactly where the marker crosses.
+        for now, claude, codex in ((self.T0, ("red", 20), ("yellow", 40)),
+                                   (self.T0 + 180, ("yellow", 21), ("yellow", 41)),
+                                   (self.T0 + 720, ("yellow", 24), ("yellow", 44)),
+                                   (self.T0 + 900, ("yellow", 25), ("green", 45))):
+            with self.subTest(now=now):
+                gauges = self.watch(view.message, now)[1]
+                self.assertEqual((gauges[0][2], gauges[0][5]), claude)
+                self.assertEqual((gauges[2][2], gauges[2][5]), codex)
