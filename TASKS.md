@@ -17,6 +17,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [27] Review pebble-quota's changes since the 10-22 architecture review for
+  simplifications that keep behaviour
+  <!-- hai:{"id":"simple-ecddbf13-895a-45b6-8a2f-c0d7d6dc6b1b","labels":["steward","review"],"createdAt":"2026-10-24T20:56:25.562Z","updatedAt":"2026-10-24T20:56:25.562Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -108,7 +112,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,26 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,26,27 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -155,6 +159,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [24]: docs/tasks/24-remove-unused-collector-helper-generality.md
 
 [26]: docs/tasks/26-reject-zero-byte-watch-strings-before-replacing-rows.md
+
+[27]: docs/tasks/27-review-pebble-quota-s-changes-since-the-10-22-architecture-review-for-.md
 
 ## Rules
 
