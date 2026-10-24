@@ -31,12 +31,12 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [9] Carry freshness and failure status through to watch rendering
+## Completed / Accepted
+
+- [ ] [9] Carry freshness and failure status through to watch rendering
     - Depends on: [8]
 
-      <!-- hai:{"id":"simple-f4553c58-87ef-4de4-b8db-1feff4b43833","labels":["steward"],"createdAt":"2026-10-19T12:35:36.286Z","updatedAt":"2026-10-24T05:59:08.594Z"} -->
-
-## Completed / Accepted
+      <!-- hai:{"id":"simple-f4553c58-87ef-4de4-b8db-1feff4b43833","labels":["steward"],"createdAt":"2026-10-19T12:35:36.286Z","updatedAt":"2026-10-24T06:24:40.690Z"} -->
 
 - [x] [24] Remove unused collector helper generality
       <!-- hai:{"id":"simple-446bba0e-2d7a-4660-b462-7362295c7112","labels":["steward"],"createdAt":"2026-10-22T05:11:43.566Z","updatedAt":"2026-10-22T07:51:17.588Z"} -->

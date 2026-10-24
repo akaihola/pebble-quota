@@ -280,3 +280,26 @@ each takes seconds.
 [watch driver]: ../../tests/watch/gauges_main.c
 [the Nix shell]: ../../watchface/shell.nix
 [the five-row contract task]: 11-enforce-the-five-row-collector-phone-and-watch-contract.md
+
+### Checks at the merged commit
+
+Fast-forwarded `main` from `d83a82b` to `20644d3`; the delivery commits are
+`c74a3ac` (plan) and `20644d3` (implementation). All five acceptance checks
+were recorded at `20644d3` from a clean detached checkout, and all passed (see
+[the evidence receipt]):
+
+- `pipeline`: requires `node` and `cc`, then runs `CompactFreshnessTests` and
+  `WatchPipelineTests`: 11 tests pass.
+- `unittest`: the full suite, 86 tests pass.
+- `ruff` and `ty`: no findings.
+- `watch-build`: `make -C watchface clean build` finishes successfully.
+
+No lockfile or editable checkout applies, so the checks declare no
+dependencies. The emulator captures above are a manual check and have no
+receipt entry.
+
+The five `check-evidence.py record` calls ran in sequence as one guarded
+command: **started at once**; wait 0 s; admission 9901, final 9823; starting
+swap 849, growth 0; 18 s; exit 0.
+
+[the evidence receipt]: 9-carry-freshness-and-failure-status-through-to-watch-rendering.evidence.json

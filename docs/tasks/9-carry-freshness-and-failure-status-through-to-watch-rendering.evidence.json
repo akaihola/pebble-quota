@@ -1,0 +1,100 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [9]",
+      "hai_id": "simple-f4553c58-87ef-4de4-b8db-1feff4b43833",
+      "title": "Carry freshness and failure status through to watch rendering",
+      "repository": "/tmp/claude-1001/pq9-evidence",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "d83a82b4a1eeb6b0852065f225eb1dc904573d3c",
+      "delivery_commits": [
+        "c74a3ac121c04ea1265a87f4f8db24828d0ffb0c",
+        "20644d3b69324d699b930e84f8b0821904945e90"
+      ],
+      "checks": [
+        {
+          "id": "pipeline",
+          "command": "command -v node >/dev/null && command -v cc >/dev/null && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_pebble_quota.CompactFreshnessTests tests.test_pebble_quota.WatchPipelineTests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "unittest",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "ruff",
+          "command": "ruff check .",
+          "dependencies": {}
+        },
+        {
+          "id": "ty",
+          "command": "ty check",
+          "dependencies": {}
+        },
+        {
+          "id": "watch-build",
+          "command": "make -C watchface clean build",
+          "dependencies": {}
+        }
+      ],
+      "evidence": {
+        "pipeline": {
+          "repository": "/tmp/claude-1001/pq9-evidence",
+          "tested_commit": "20644d3b69324d699b930e84f8b0821904945e90",
+          "dependencies": {},
+          "issue": "pebble-quota [9]",
+          "check": "pipeline",
+          "command": "command -v node >/dev/null && command -v cc >/dev/null && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_pebble_quota.CompactFreshnessTests tests.test_pebble_quota.WatchPipelineTests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:24:08.718909+00:00"
+        },
+        "unittest": {
+          "repository": "/tmp/claude-1001/pq9-evidence",
+          "tested_commit": "20644d3b69324d699b930e84f8b0821904945e90",
+          "dependencies": {},
+          "issue": "pebble-quota [9]",
+          "check": "unittest",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:24:19.610606+00:00"
+        },
+        "ruff": {
+          "repository": "/tmp/claude-1001/pq9-evidence",
+          "tested_commit": "20644d3b69324d699b930e84f8b0821904945e90",
+          "dependencies": {},
+          "issue": "pebble-quota [9]",
+          "check": "ruff",
+          "command": "ruff check .",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:24:19.726344+00:00"
+        },
+        "ty": {
+          "repository": "/tmp/claude-1001/pq9-evidence",
+          "tested_commit": "20644d3b69324d699b930e84f8b0821904945e90",
+          "dependencies": {},
+          "issue": "pebble-quota [9]",
+          "check": "ty",
+          "command": "ty check",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:24:19.964712+00:00"
+        },
+        "watch-build": {
+          "repository": "/tmp/claude-1001/pq9-evidence",
+          "tested_commit": "20644d3b69324d699b930e84f8b0821904945e90",
+          "dependencies": {},
+          "issue": "pebble-quota [9]",
+          "check": "watch-build",
+          "command": "make -C watchface clean build",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T06:24:21.494505+00:00"
+        }
+      }
+    }
+  ]
+}
