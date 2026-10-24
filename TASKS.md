@@ -19,11 +19,6 @@ Rules for TASKS.md usage are at the bottom of the file.
 
   <!-- hai:{"id":"simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106","labels":["steward"],"createdAt":"2026-10-19T12:35:36.920Z","updatedAt":"2026-10-19T12:35:36.920Z"} -->
 
-- [9] Carry freshness and failure status through to watch rendering
-    - Depends on: [8]
-
-  <!-- hai:{"id":"simple-f4553c58-87ef-4de4-b8db-1feff4b43833","labels":["steward"],"createdAt":"2026-10-19T12:35:36.286Z","updatedAt":"2026-10-19T12:35:36.286Z"} -->
-
 - [7] Gate releases on collector and phone behavior checks
   <!-- hai:{"id":"simple-0973cf3d-1685-468a-b2fe-aa6a52710543","labels":["steward"],"createdAt":"2026-10-19T12:35:35.717Z","updatedAt":"2026-10-19T12:35:35.717Z"} -->
 
@@ -31,6 +26,11 @@ Rules for TASKS.md usage are at the bottom of the file.
   <!-- hai:{"id":"simple-f5d94773-9467-431d-b527-2947873cdf46","labels":["steward"],"createdAt":"2026-10-19T12:35:35.429Z","updatedAt":"2026-10-19T12:35:35.429Z"} -->
 
 ## Ordered backlog
+
+- [9] Carry freshness and failure status through to watch rendering
+    - Depends on: [8]
+
+  <!-- hai:{"id":"simple-f4553c58-87ef-4de4-b8db-1feff4b43833","labels":["steward"],"createdAt":"2026-10-19T12:35:36.286Z","updatedAt":"2026-10-24T05:58:35.111Z"} -->
 
 ## Scheduled
 

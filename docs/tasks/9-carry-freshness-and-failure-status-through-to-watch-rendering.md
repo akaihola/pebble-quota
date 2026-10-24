@@ -27,3 +27,23 @@ and sends the current collection-pass timestamp. Codex still has no equivalent.
   stale only after a valid observation. Keep sanitized detail on host, concise on watch.
 - Document new semantics and additive rollout order (API before consumers), with
   old-client compatibility and timestamp-preserving rollback.
+
+## Steward notes, 2026-10-24
+
+Promoted from Unverified proposals by the steward (tier 1: the quota source);
+this authorizes the implementation, not a deployment. Confirmed on `main`
+(`b1ef6a8`): `compact_watch()` sends the pass's `collected_at` as `at` for
+every row and drops `stale`, `age_seconds` and `last_success_at`, so a Claude
+window kept after a 429 reaches the watch as fresh.
+
+- Keep `latest.json` backward compatible: add fields, never rename or remove
+  one or change its meaning. kandev-pacer and the steward's quota line read it.
+- `pebble-quota.service` runs `collector/pebble_quota.py` from this checkout.
+  Don't restart it; the steward restarts it after acceptance. Installing on
+  the phone or watch is Antti's. Check the watch side on the Emery emulator
+  under `xvfb-run` (`watchface/shell.nix`, the installed SDK) and record what
+  each capture shows, or record the missing prerequisite. Never claim
+  on-device verification.
+- Keep machine paths out of committed docs and code; the check receipt is
+  exempt. A formatting-only change that a required check demands is allowed.
+- Size: about 3–4 hours.
