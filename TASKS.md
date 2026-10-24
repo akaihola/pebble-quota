@@ -31,10 +31,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 - [x] [26] Reject zero-byte watch strings before replacing rows
       <!-- hai:{"id":"simple-1446533a-f439-4760-b6ea-340b8b48b273","labels":["steward"],"createdAt":"2026-10-24T08:02:54.573Z","updatedAt":"2026-10-24T09:14:43.294Z"} -->
 
-- [ ] [11] Enforce the five-row collector phone and watch contract
+- [x] [11] Enforce the five-row collector phone and watch contract
     - Depends on: [8], [9]
 
-      <!-- hai:{"id":"simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106","labels":["steward"],"createdAt":"2026-10-19T12:35:36.920Z","updatedAt":"2026-10-24T06:50:33.611Z"} -->
+      <!-- hai:{"id":"simple-4f4aa9f4-cf9c-4daf-a47b-240e65d9f106","labels":["steward"],"createdAt":"2026-10-19T12:35:36.920Z","updatedAt":"2026-10-24T09:47:58.493Z"} -->
 
 - [x] [9] Carry freshness and failure status through to watch rendering
     - Depends on: [8]
