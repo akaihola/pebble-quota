@@ -17,10 +17,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [14] Prevent older phone responses from overwriting newer settings or data
-  <!-- hai:{"id":"simple-07285625-bd27-4eb2-8747-624e02681c4a","labels":["steward"],"createdAt":"2026-10-19T12:35:47.291Z","updatedAt":"2026-10-24T09:53:17.407Z"} -->
-
 ## Scheduled
+
+- [14] Prevent older phone responses from overwriting newer settings or data
+  <!-- hai:{"id":"simple-07285625-bd27-4eb2-8747-624e02681c4a","labels":["steward"],"createdAt":"2026-10-19T12:35:47.291Z","updatedAt":"2026-10-24T09:53:49.161Z"} -->
 
 ## In Progress
 
