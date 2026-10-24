@@ -96,3 +96,43 @@ The focused decoder suite passed all six tests; the diff has no whitespace error
 
 - **watch-decoder-regression:** started at once; waited 0.00 s; admission 10537.3 MiB, final 10551.3 MiB available; starting swap 1056.9 MiB, swap growth 0 MiB; elapsed 0.40 s; exit 0.
 - **premerge-ruff:** started at once; waited 0.00 s; admission 10610.0 MiB, final 10604.1 MiB available; starting swap 1056.2 MiB, swap growth 0 MiB; elapsed 0.20 s; exit 0.
+
+## Merged verification
+
+Base commit: `0aac4c3abbd86a10801731fea98fc9bbc4855f62`. Delivery and tested merged commit:
+`17031b0069cef67c469135f0cff48a864bf91ab1` (fast-forward merge).
+All acceptance checks were recorded using `check-evidence.py record` from the
+clean task checkout at that commit, before the completion commit. There is
+no repository lockfile or editable Python dependency to declare; check
+dependencies are empty, matching issue [11].
+
+- **contract:** passed, 22 tests, including the new decoder regression.
+- **unittest:** passed, all 100 tests in the full discovery suite.
+- **ruff:** passed (`ruff check .`).
+- **ty:** passed (`ty check`).
+- **watch-build:** passed (`make -C watchface clean build`); no install or deployment.
+- **regression:** the original standalone reproducer passed with
+  `accepted, rejected` and all five previous row titles preserved.
+
+The build emitted a format-truncation warning in the unchanged [watch renderer]
+and a linker warning about an RWX load segment; it finished with exit 0.
+
+Exact commands, tested commit, timestamps and exit codes are in the
+[check receipt]. No acceptance was granted to this issue or issue [11].
+
+### Recording memory reports
+
+Each command below is the corresponding `check-evidence.py record` call;
+commands ran sequentially, with a ten-minute timeout and process-group cleanup
+on a memory or timeout stop. All finished normally.
+
+- **record-contract:** started at once; waited 0.00 s; admission 10727.4 MiB, final 10656.9 MiB available; starting swap 1056.2 MiB, swap growth 0 MiB; elapsed 8.22 s; exit 0.
+- **record-unittest:** started at once; waited 0.00 s; admission 10623.4 MiB, final 10730.0 MiB available; starting swap 1056.2 MiB, swap growth 0 MiB; elapsed 14.03 s; exit 0.
+- **record-ruff:** started at once; waited 0.00 s; admission 10737.2 MiB, final 10703.6 MiB available; starting swap 1056.2 MiB, swap growth 0 MiB; elapsed 0.20 s; exit 0.
+- **record-ty:** started at once; waited 0.00 s; admission 10707.5 MiB, final 10724.7 MiB available; starting swap 1056.2 MiB, swap growth 0 MiB; elapsed 0.40 s; exit 0.
+- **record-watch-build:** started at once; waited 0.00 s; admission 10723.7 MiB, final 10678.6 MiB available; starting swap 1056.2 MiB, swap growth 0 MiB; elapsed 1.60 s; exit 0.
+- **record-regression:** started at once; waited 0.00 s; admission 10676.7 MiB, final 10656.7 MiB available; starting swap 1056.2 MiB, swap growth 0 MiB; elapsed 0.40 s; exit 0.
+
+[check receipt]: 26-reject-zero-byte-watch-strings-before-replacing-rows.evidence.json
+
+[watch renderer]: ../../watchface/src/c/watchface.c

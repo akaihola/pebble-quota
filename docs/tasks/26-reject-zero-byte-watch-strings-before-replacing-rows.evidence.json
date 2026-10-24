@@ -1,0 +1,115 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [26]",
+      "hai_id": "simple-1446533a-f439-4760-b6ea-340b8b48b273",
+      "title": "Reject zero-byte watch strings before replacing rows",
+      "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-26-reject-zero-byte-watch-strings-before-replacing-rows-0bab2b70",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "0aac4c3abbd86a10801731fea98fc9bbc4855f62",
+      "delivery_commits": [
+        "17031b0069cef67c469135f0cff48a864bf91ab1"
+      ],
+      "checks": [
+        {
+          "id": "contract",
+          "command": "command -v node >/dev/null && command -v cc >/dev/null && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_pebble_quota.CompactSelectionTests tests.test_pebble_quota.PhoneContractTests tests.test_pebble_quota.WatchDecodeTests tests.test_pebble_quota.WatchPipelineTests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "unittest",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "ruff",
+          "command": "ruff check .",
+          "dependencies": {}
+        },
+        {
+          "id": "ty",
+          "command": "ty check",
+          "dependencies": {}
+        },
+        {
+          "id": "watch-build",
+          "command": "make -C watchface clean build",
+          "dependencies": {}
+        },
+        {
+          "id": "regression",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'\nfrom tests.test_pebble_quota import WatchDecodeTests\nWatchDecodeTests.setUpClass()\ntry:\n    case = WatchDecodeTests()\n    before = case.message(case.FIVE, R2=('i4', case.WEEK + 1))\n    malformed = case.message(case.FIVE[:1], UNAVAILABLE=('z', ''))\n    actual = case.titles(before, malformed)\n    print(actual)\n    assert actual == (['accepted', 'rejected'], case.UNPAIRED)\nfinally:\n    WatchDecodeTests.doClassCleanups()\nPY",
+          "dependencies": {}
+        }
+      ],
+      "evidence": {
+        "contract": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-26-reject-zero-byte-watch-strings-before-replacing-rows-0bab2b70",
+          "tested_commit": "17031b0069cef67c469135f0cff48a864bf91ab1",
+          "dependencies": {},
+          "issue": "pebble-quota [26]",
+          "check": "contract",
+          "command": "command -v node >/dev/null && command -v cc >/dev/null && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_pebble_quota.CompactSelectionTests tests.test_pebble_quota.PhoneContractTests tests.test_pebble_quota.WatchDecodeTests tests.test_pebble_quota.WatchPipelineTests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T08:48:19.084922+00:00"
+        },
+        "unittest": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-26-reject-zero-byte-watch-strings-before-replacing-rows-0bab2b70",
+          "tested_commit": "17031b0069cef67c469135f0cff48a864bf91ab1",
+          "dependencies": {},
+          "issue": "pebble-quota [26]",
+          "check": "unittest",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T08:48:37.465072+00:00"
+        },
+        "ruff": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-26-reject-zero-byte-watch-strings-before-replacing-rows-0bab2b70",
+          "tested_commit": "17031b0069cef67c469135f0cff48a864bf91ab1",
+          "dependencies": {},
+          "issue": "pebble-quota [26]",
+          "check": "ruff",
+          "command": "ruff check .",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T08:48:37.686247+00:00"
+        },
+        "ty": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-26-reject-zero-byte-watch-strings-before-replacing-rows-0bab2b70",
+          "tested_commit": "17031b0069cef67c469135f0cff48a864bf91ab1",
+          "dependencies": {},
+          "issue": "pebble-quota [26]",
+          "check": "ty",
+          "command": "ty check",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T08:48:38.082632+00:00"
+        },
+        "watch-build": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-26-reject-zero-byte-watch-strings-before-replacing-rows-0bab2b70",
+          "tested_commit": "17031b0069cef67c469135f0cff48a864bf91ab1",
+          "dependencies": {},
+          "issue": "pebble-quota [26]",
+          "check": "watch-build",
+          "command": "make -C watchface clean build",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T08:48:39.791304+00:00"
+        },
+        "regression": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-26-reject-zero-byte-watch-strings-before-replacing-rows-0bab2b70",
+          "tested_commit": "17031b0069cef67c469135f0cff48a864bf91ab1",
+          "dependencies": {},
+          "issue": "pebble-quota [26]",
+          "check": "regression",
+          "command": "PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'\nfrom tests.test_pebble_quota import WatchDecodeTests\nWatchDecodeTests.setUpClass()\ntry:\n    case = WatchDecodeTests()\n    before = case.message(case.FIVE, R2=('i4', case.WEEK + 1))\n    malformed = case.message(case.FIVE[:1], UNAVAILABLE=('z', ''))\n    actual = case.titles(before, malformed)\n    print(actual)\n    assert actual == (['accepted', 'rejected'], case.UNPAIRED)\nfinally:\n    WatchDecodeTests.doClassCleanups()\nPY",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T08:48:40.197769+00:00"
+        }
+      }
+    }
+  ]
+}
