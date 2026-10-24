@@ -22,10 +22,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [26] Reject zero-byte watch strings before replacing rows
-  <!-- hai:{"id":"simple-1446533a-f439-4760-b6ea-340b8b48b273","labels":["steward"],"createdAt":"2026-10-24T08:02:54.573Z","updatedAt":"2026-10-24T08:02:54.573Z"} -->
-
 ## Scheduled
+
+- [26] Reject zero-byte watch strings before replacing rows
+  <!-- hai:{"id":"simple-1446533a-f439-4760-b6ea-340b8b48b273","labels":["steward"],"createdAt":"2026-10-24T08:02:54.573Z","updatedAt":"2026-10-24T08:45:27.107Z"} -->
 
 ## In Progress
 
