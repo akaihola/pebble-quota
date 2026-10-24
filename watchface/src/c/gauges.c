@@ -23,14 +23,11 @@ static bool field_int(const Field *field, int32_t low, int32_t high, int32_t *ou
 // A terminated string of min to max characters, each from low to high.
 static bool field_string(const Field *field, size_t min, size_t max, char low, char high,
                          char *out) {
-  if (field->type != FIELD_STRING) return false;
+  if (field->type != FIELD_STRING || field->length == 0) return false;
   const char *text = field->data;
-  size_t length = 0;
-  if (field->length > 0) {
-    const char *end = memchr(text, '\0', field->length);
-    if (!end) return false;
-    length = (size_t)(end - text);
-  }
+  const char *end = memchr(text, '\0', field->length);
+  if (!end) return false;
+  size_t length = (size_t)(end - text);
   if (length < min || length > max) return false;
   for (size_t i = 0; i < length; ++i) {
     if (text[i] < low || text[i] > high) return false;

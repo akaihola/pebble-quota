@@ -79,3 +79,20 @@ needed its installed C++ runtime added to the library search path.
   the memory guard was installed; no contemporaneous memory measurements
   were captured. It completed in 0.45 s with exit 0. Subsequent inventories
   were restricted to the SDK and repository.
+
+## Implementation and review
+
+The shared string validator now rejects zero-length tuples before accessing
+string data, then requires a NUL within the declared length for every string.
+The new regression sends five valid rows followed by one row with a zero-byte
+`UNAVAILABLE` tuple and verifies rejection with all five earlier rows intact.
+Existing empty-provider and zero-row coverage is unchanged and passes.
+
+Reviewed the decoder and host tuple construction: `s` includes a terminator,
+whereas `z` omits it. No protocol, collector, phone, or version changes.
+The focused decoder suite passed all six tests; the diff has no whitespace errors.
+
+### Premerge memory reports
+
+- **watch-decoder-regression:** started at once; waited 0.00 s; admission 10537.3 MiB, final 10551.3 MiB available; starting swap 1056.9 MiB, swap growth 0 MiB; elapsed 0.40 s; exit 0.
+- **premerge-ruff:** started at once; waited 0.00 s; admission 10610.0 MiB, final 10604.1 MiB available; starting swap 1056.2 MiB, swap growth 0 MiB; elapsed 0.20 s; exit 0.

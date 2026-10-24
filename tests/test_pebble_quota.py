@@ -2007,6 +2007,12 @@ class WatchDecodeTests(WatchTools):
                                              self.message(two, **overrides)),
                                  (["accepted", "rejected"], self.UNPAIRED))
 
+    def test_zero_byte_unavailable_string_keeps_all_previous_rows(self):
+        before = self.message(self.FIVE, R2=("i4", self.WEEK + 1))
+        malformed = self.message(self.FIVE[:1], UNAVAILABLE=("z", ""))
+        self.assertEqual(self.titles(before, malformed),
+                         (["accepted", "rejected"], self.UNPAIRED))
+
     def test_integers_of_any_tuple_width_and_absent_temperature_are_valid(self):
         message = self.message([self.FIVE[0]], "X", ROW_COUNT=("u1", 1), U0=("i1", 20), R0=("u4", self.NOW + 3600),
                                D0=("i2", 18_000), E0=("u2", 0), TEMP=None)
