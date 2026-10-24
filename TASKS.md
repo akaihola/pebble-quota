@@ -29,12 +29,12 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Scheduled
 
-- [9] Carry freshness and failure status through to watch rendering
+## In Progress
+
+- [~] [9] Carry freshness and failure status through to watch rendering
     - Depends on: [8]
 
-  <!-- hai:{"id":"simple-f4553c58-87ef-4de4-b8db-1feff4b43833","labels":["steward"],"createdAt":"2026-10-19T12:35:36.286Z","updatedAt":"2026-10-24T05:58:59.950Z"} -->
-
-## In Progress
+      <!-- hai:{"id":"simple-f4553c58-87ef-4de4-b8db-1feff4b43833","labels":["steward"],"createdAt":"2026-10-19T12:35:36.286Z","updatedAt":"2026-10-24T05:59:08.594Z"} -->
 
 ## Completed / Accepted
 
