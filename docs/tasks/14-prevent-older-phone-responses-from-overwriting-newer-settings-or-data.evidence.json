@@ -1,0 +1,217 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [14]",
+      "hai_id": "simple-07285625-bd27-4eb2-8747-624e02681c4a",
+      "title": "Prevent older phone responses from overwriting newer settings or data",
+      "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-14-prevent-older-phone-responses-from-overwriting-newer-settings-or-e64c4b4f",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "4426576a38ede15a2fbae59c6698eee09a26e5a4",
+      "delivery_commits": [
+        "e225b15301363c14bd05d5f0242925ebe1ccd00f"
+      ],
+      "checks": [
+        {
+          "id": "phone",
+          "command": "python3 -m unittest discover -s tests -p test_pebble_quota.py -k PhoneContractTests -v",
+          "dependencies": {
+            "python3": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/python3"
+            },
+            "node": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/node"
+            },
+            "cc": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/cc"
+            }
+          }
+        },
+        {
+          "id": "unit",
+          "command": "python3 -m unittest discover -s tests -v",
+          "dependencies": {
+            "python3": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/python3"
+            },
+            "node": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/node"
+            },
+            "cc": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/cc"
+            }
+          }
+        },
+        {
+          "id": "ruff",
+          "command": "ruff check .",
+          "dependencies": {
+            "ruff": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/ruff"
+            }
+          }
+        },
+        {
+          "id": "ty",
+          "command": "ty check",
+          "dependencies": {
+            "ty": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/ty"
+            }
+          }
+        },
+        {
+          "id": "baseline",
+          "command": "python3 - <<'PY'\nimport importlib.util\nfrom pathlib import Path\nimport subprocess\nimport tempfile\nimport unittest\n\nspec = importlib.util.spec_from_file_location('quota_tests', 'tests/test_pebble_quota.py')\nmodule = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(module)\nwith tempfile.TemporaryDirectory() as directory:\n    root = Path(directory)\n    script = root / 'src/pkjs/index.js'\n    script.parent.mkdir(parents=True)\n    script.write_bytes(subprocess.check_output(['git', 'show', '3bbc2c9:watchface/src/pkjs/index.js']))\n    (root / 'src/c').symlink_to(module.PhoneContractTests.WATCHFACE / 'src/c', target_is_directory=True)\n    module.PhoneContractTests.WATCHFACE = root\n    names = [\n        'test_latest_refresh_wins_reverse_ready_watch_and_timer_completions',\n        'test_timestamp_regressions_expire_without_rejected_requests_extending_guard',\n        'test_appmessage_failure_defers_until_refresh_without_retry_loop',\n    ]\n    suite = unittest.TestSuite(module.PhoneContractTests(name) for name in names)\n    result = unittest.TextTestRunner(verbosity=2).run(suite)\n    failed_names = {getattr(test, 'test_case', test)._testMethodName for test, _ in result.failures}\n    if result.errors or result.skipped or failed_names != set(names):\n        raise SystemExit('Expected each acceptance regression to fail on audited baseline')\n    print('All three acceptance regressions fail on 3bbc2c9 as expected')\nPY",
+          "dependencies": {
+            "python3": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/python3"
+            },
+            "node": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/node"
+            },
+            "cc": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/cc"
+            },
+            "git": {
+              "kind": "sha256",
+              "path": "/etc/profiles/per-user/agent/bin/git"
+            }
+          }
+        }
+      ],
+      "evidence": {
+        "phone": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-14-prevent-older-phone-responses-from-overwriting-newer-settings-or-e64c4b4f",
+          "tested_commit": "e225b15301363c14bd05d5f0242925ebe1ccd00f",
+          "dependencies": {
+            "python3": {
+              "kind": "sha256",
+              "path": "/nix/store/lb41b0anx1f98y9y5s9mdv97gjgsq740-python3-3.14.7/bin/python3.14",
+              "value": "29affd28c5f44c2aeab8ac295bc850696f125020054243843ac122219e352d35"
+            },
+            "node": {
+              "kind": "sha256",
+              "path": "/nix/store/m0256z6rrjwmvxkbymm7a28n0nw2zll9-nodejs-slim-24.21.0/bin/node",
+              "value": "f89c69d163e2686ed04cae19f5680668d4c1c64a072a70c1a6e50842a7a9e433"
+            },
+            "cc": {
+              "kind": "sha256",
+              "path": "/nix/store/j1938gsbvbhkyz4kbmvjk56r479mkw3s-gcc-wrapper-16.2.0/bin/gcc",
+              "value": "79770329fa1c8d56f5d70222d22b04b2b74cc74254da74b16205ba8da4e7b4b5"
+            }
+          },
+          "issue": "pebble-quota [14]",
+          "check": "phone",
+          "command": "python3 -m unittest discover -s tests -p test_pebble_quota.py -k PhoneContractTests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T09:57:44.646157+00:00"
+        },
+        "unit": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-14-prevent-older-phone-responses-from-overwriting-newer-settings-or-e64c4b4f",
+          "tested_commit": "e225b15301363c14bd05d5f0242925ebe1ccd00f",
+          "dependencies": {
+            "python3": {
+              "kind": "sha256",
+              "path": "/nix/store/lb41b0anx1f98y9y5s9mdv97gjgsq740-python3-3.14.7/bin/python3.14",
+              "value": "29affd28c5f44c2aeab8ac295bc850696f125020054243843ac122219e352d35"
+            },
+            "node": {
+              "kind": "sha256",
+              "path": "/nix/store/m0256z6rrjwmvxkbymm7a28n0nw2zll9-nodejs-slim-24.21.0/bin/node",
+              "value": "f89c69d163e2686ed04cae19f5680668d4c1c64a072a70c1a6e50842a7a9e433"
+            },
+            "cc": {
+              "kind": "sha256",
+              "path": "/nix/store/j1938gsbvbhkyz4kbmvjk56r479mkw3s-gcc-wrapper-16.2.0/bin/gcc",
+              "value": "79770329fa1c8d56f5d70222d22b04b2b74cc74254da74b16205ba8da4e7b4b5"
+            }
+          },
+          "issue": "pebble-quota [14]",
+          "check": "unit",
+          "command": "python3 -m unittest discover -s tests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T09:57:59.090725+00:00"
+        },
+        "ruff": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-14-prevent-older-phone-responses-from-overwriting-newer-settings-or-e64c4b4f",
+          "tested_commit": "e225b15301363c14bd05d5f0242925ebe1ccd00f",
+          "dependencies": {
+            "ruff": {
+              "kind": "sha256",
+              "path": "/nix/store/n67r0lpnvh89s3mbgnys5fcrl131prrf-ruff-0.16.8/bin/ruff",
+              "value": "3b981580d0f5a56fc16b8320c7c838d84191955c558bbf355c50fae458fa7164"
+            }
+          },
+          "issue": "pebble-quota [14]",
+          "check": "ruff",
+          "command": "ruff check .",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T09:58:04.370090+00:00"
+        },
+        "ty": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-14-prevent-older-phone-responses-from-overwriting-newer-settings-or-e64c4b4f",
+          "tested_commit": "e225b15301363c14bd05d5f0242925ebe1ccd00f",
+          "dependencies": {
+            "ty": {
+              "kind": "sha256",
+              "path": "/nix/store/n37djjpdwq1wivv441a88ib31y92a2ly-ty-0.0.84/bin/ty",
+              "value": "6255e3a8be665d940befd4157441c232c0e48ddb064c13c7407c07fbe3ea886a"
+            }
+          },
+          "issue": "pebble-quota [14]",
+          "check": "ty",
+          "command": "ty check",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T09:58:04.763182+00:00"
+        },
+        "baseline": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-14-prevent-older-phone-responses-from-overwriting-newer-settings-or-e64c4b4f",
+          "tested_commit": "e225b15301363c14bd05d5f0242925ebe1ccd00f",
+          "dependencies": {
+            "python3": {
+              "kind": "sha256",
+              "path": "/nix/store/lb41b0anx1f98y9y5s9mdv97gjgsq740-python3-3.14.7/bin/python3.14",
+              "value": "29affd28c5f44c2aeab8ac295bc850696f125020054243843ac122219e352d35"
+            },
+            "node": {
+              "kind": "sha256",
+              "path": "/nix/store/m0256z6rrjwmvxkbymm7a28n0nw2zll9-nodejs-slim-24.21.0/bin/node",
+              "value": "f89c69d163e2686ed04cae19f5680668d4c1c64a072a70c1a6e50842a7a9e433"
+            },
+            "cc": {
+              "kind": "sha256",
+              "path": "/nix/store/j1938gsbvbhkyz4kbmvjk56r479mkw3s-gcc-wrapper-16.2.0/bin/gcc",
+              "value": "79770329fa1c8d56f5d70222d22b04b2b74cc74254da74b16205ba8da4e7b4b5"
+            },
+            "git": {
+              "kind": "sha256",
+              "path": "/nix/store/lg46w7hrjx7kylsh6645c9l975i8h43b-git-2.55.0/bin/git",
+              "value": "d88c25f33602bd5898b398b04418916512be06821f47034832b3f5736e911706"
+            }
+          },
+          "issue": "pebble-quota [14]",
+          "check": "baseline",
+          "command": "python3 - <<'PY'\nimport importlib.util\nfrom pathlib import Path\nimport subprocess\nimport tempfile\nimport unittest\n\nspec = importlib.util.spec_from_file_location('quota_tests', 'tests/test_pebble_quota.py')\nmodule = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(module)\nwith tempfile.TemporaryDirectory() as directory:\n    root = Path(directory)\n    script = root / 'src/pkjs/index.js'\n    script.parent.mkdir(parents=True)\n    script.write_bytes(subprocess.check_output(['git', 'show', '3bbc2c9:watchface/src/pkjs/index.js']))\n    (root / 'src/c').symlink_to(module.PhoneContractTests.WATCHFACE / 'src/c', target_is_directory=True)\n    module.PhoneContractTests.WATCHFACE = root\n    names = [\n        'test_latest_refresh_wins_reverse_ready_watch_and_timer_completions',\n        'test_timestamp_regressions_expire_without_rejected_requests_extending_guard',\n        'test_appmessage_failure_defers_until_refresh_without_retry_loop',\n    ]\n    suite = unittest.TestSuite(module.PhoneContractTests(name) for name in names)\n    result = unittest.TextTestRunner(verbosity=2).run(suite)\n    failed_names = {getattr(test, 'test_case', test)._testMethodName for test, _ in result.failures}\n    if result.errors or result.skipped or failed_names != set(names):\n        raise SystemExit('Expected each acceptance regression to fail on audited baseline')\n    print('All three acceptance regressions fail on 3bbc2c9 as expected')\nPY",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-24T09:58:05.271041+00:00"
+        }
+      }
+    }
+  ]
+}

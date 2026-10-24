@@ -21,10 +21,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [14] Prevent older phone responses from overwriting newer settings or data
-      <!-- hai:{"id":"simple-07285625-bd27-4eb2-8747-624e02681c4a","labels":["steward"],"createdAt":"2026-10-19T12:35:47.291Z","updatedAt":"2026-10-24T09:53:59.019Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [14] Prevent older phone responses from overwriting newer settings or data
+      <!-- hai:{"id":"simple-07285625-bd27-4eb2-8747-624e02681c4a","labels":["steward"],"createdAt":"2026-10-19T12:35:47.291Z","updatedAt":"2026-10-24T09:58:49.426Z"} -->
 
 - [x] [26] Reject zero-byte watch strings before replacing rows
       <!-- hai:{"id":"simple-1446533a-f439-4760-b6ea-340b8b48b273","labels":["steward"],"createdAt":"2026-10-24T08:02:54.573Z","updatedAt":"2026-10-24T09:14:43.294Z"} -->

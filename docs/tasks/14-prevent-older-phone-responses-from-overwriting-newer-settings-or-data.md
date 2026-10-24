@@ -123,3 +123,44 @@ are seconds. Reports contain resource status only, not command output.
 [watchface guide]: ../../watchface/README.md
 [Node fixture]: ../../tests/watch/phone.js
 [PhoneContractTests]: ../../tests/test_pebble_quota.py
+
+## Checks at the merged commit
+
+Merged commit: `e225b15301363c14bd05d5f0242925ebe1ccd00f`; base: `4426576a38ede15a2fbae59c6698eee09a26e5a4`.
+Delivery commits, oldest first: `e225b15301363c14bd05d5f0242925ebe1ccd00f`. The task branch and worktree are
+retained; checks ran with the task worktree clean and detached at this commit.
+The [check receipt] contains the exact commands, tool hashes and results. This
+project has no dependency lockfile or editable local package dependencies; its
+checks use the standard library and the declared Python, Node, C, Git, Ruff and
+ty executables.
+
+- **Phone:** `python3 -m unittest discover -s tests -p test_pebble_quota.py -k PhoneContractTests -v`
+  passed all nine tests, with no skips.
+- **Unit:** `python3 -m unittest discover -s tests -v` passed all 106 tests,
+  with no skips.
+- **Lint:** `ruff check .` passed.
+- **Types:** `ty check` passed.
+- **Baseline:** the receipt's embedded baseline regression probe verified all
+  three expected test failures on `3bbc2c9` and exited zero. The same tests pass
+  in the phone and full-suite records above.
+
+## Memory guard for evidence recording
+
+Each command was `uv run <recorder> record <declaration> 'pebble-quota [14]'
+<check-id>`, with full paths captured in the receipt. Each ran alone with a
+240-second timeout and the required memory and swap monitoring. Measurements
+are MiB; waits and elapsed are seconds.
+
+| Check ID | Outcome | Wait | Admission | Final | Starting swap | Swap growth | Elapsed | Status |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `phone` | started at once | 0.0 | 11090.8 | 11103.4 | 1133.7 | 0.0 | 2.61 | exit 0 |
+| `unit` | started at once | 0.0 | 11103.6 | 11265.8 | 1133.7 | -0.3 | 14.46 | exit 0 |
+| `ruff` | started at once | 0.0 | 11453.4 | 11451.6 | 1133.4 | 0.0 | 0.2 | exit 0 |
+| `ty` | started at once | 0.0 | 11452.6 | 11452.9 | 1133.4 | 0.0 | 0.3 | exit 0 |
+| `baseline` | started at once | 0.0 | 11450.1 | 11413.3 | 1133.4 | 0.0 | 0.5 | exit 0 |
+
+All acceptance checks are recorded and passing. No owner action or agent-owned
+follow-up remains for this issue. Completion is pending steward acceptance;
+the acceptance checkbox remains unchecked.
+
+[check receipt]: 14-prevent-older-phone-responses-from-overwriting-newer-settings-or-data.evidence.json
