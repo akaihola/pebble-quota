@@ -22,6 +22,9 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [26] Reject zero-byte watch strings before replacing rows
+  <!-- hai:{"id":"simple-1446533a-f439-4760-b6ea-340b8b48b273","labels":["steward"],"createdAt":"2026-10-24T08:02:54.573Z","updatedAt":"2026-10-24T08:02:54.573Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -107,7 +110,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,26 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -152,6 +155,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [23]: docs/tasks/23-isolate-the-unavailable-snapshot-merge.md
 
 [24]: docs/tasks/24-remove-unused-collector-helper-generality.md
+
+[26]: docs/tasks/26-reject-zero-byte-watch-strings-before-replacing-rows.md
 
 ## Rules
 
