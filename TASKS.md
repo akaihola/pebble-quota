@@ -23,9 +23,9 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Completed / Accepted
 
-- [ ] [29] Check pebble-quota's documents against the ten source changes since the
+- [x] [29] Check pebble-quota's documents against the ten source changes since the
   10-22 docs review
-      <!-- hai:{"id":"simple-01984467-4ebe-4ac4-bca6-f25d27f9ab34","labels":["steward","review"],"createdAt":"2026-10-24T23:50:27.223Z","updatedAt":"2026-10-25T00:07:59.203Z"} -->
+      <!-- hai:{"id":"simple-01984467-4ebe-4ac4-bca6-f25d27f9ab34","labels":["steward","review"],"createdAt":"2026-10-24T23:50:27.223Z","updatedAt":"2026-10-25T00:14:46.375Z"} -->
 
 - [x] [28] Share one loopback HTTP server helper across pebble-quota's tests
       <!-- hai:{"id":"simple-0bb6aca7-46a4-4c35-8174-69d3d6348f30","labels":["steward"],"createdAt":"2026-10-24T21:21:39.661Z","updatedAt":"2026-10-24T22:07:04.534Z"} -->
