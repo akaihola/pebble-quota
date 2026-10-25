@@ -3,8 +3,8 @@
 The standard-library [collector] provides `collect` and `serve`; see the
 [quick start] for commands. Run from the repository root, or use an absolute
 script path and output path. No Python packages are required beyond the standard
-library; the source requires Python 3.10 or newer. The current source check ran
-on Python 3.14.7, not a minimum-version compatibility matrix.
+library; the source requires Python 3.10 or newer. See the [documentation recheck]
+for the verification environment.
 
 ## Commands and settings
 
@@ -81,7 +81,7 @@ Each row contains:
 | `r` | Reset time as integral Unix seconds |
 | `d` | Window duration in seconds |
 | `p` | Rounded `(elapsed_fraction - used_fraction) * 100`; positive means unused quota is ahead of constant-use pace, negative means usage is ahead of pace |
-| `o` | When the provider reading behind the row succeeded, as integral Unix seconds: the service's `last_success_at`, or `at` when that is missing |
+| `o` | Collection-pass time of the provider's last successful reading, as integral Unix seconds: the service's `last_success_at`, or `at` when that is missing |
 | `e` | Optional `1`: the provider's latest attempt failed and the row is its last good reading, from `o` |
 
 `n`, `o` and `e` were added within version 1; every older field keeps its
@@ -90,7 +90,7 @@ meaning. `e` and `n` carry no error text: diagnostics stay in the snapshot.
 Synthetic example at the start of a five-hour window:
 
 ```json
-{"v":1,"at":1800000000,"q":[{"s":"C","w":"5h","u":20,"r":1800018000,"d":18000,"p":-20,"o":1800000000}],"t":215}
+{"v":1,"at":1800000000,"q":[{"s":"C","w":"5h","u":20,"r":1800018000,"d":18000,"p":-20,"o":1800000000}],"n":"X","t":215}
 ```
 
 ### Five gauge lines
@@ -124,9 +124,9 @@ labels with any other parenthesised scope are invalid, however short.
 
 The phone checks the whole payload before it builds a message: `v` must be 1,
 `at` an integer from 0 through 2147483647, `n` absent or up to three capital
-letters, `t` absent or a signed 32-bit integer, and `q` an array whose length
-plus the length of `n` is at most five. Each row needs `s` (one capital
-letter), `w` (one to seven printable ASCII characters), `u` (0–100), `r`
+letters, `t` absent or an integer from -2147483647 through 2147483647, and `q` an
+array whose length plus the length of `n` is at most five. Each row needs `s`
+(one capital letter), `w` (one to seven printable ASCII characters), `u` (0–100), `r`
 (0–2147483647) and `d` (1–21,474,836) as integers. `o` may be absent or an
 integer timestamp, and `e` absent, 0 or 1. The phone does not read `p`. Any
 failure, including unparsable JSON, logs `Rejected quota data:` with the reason
@@ -135,10 +135,13 @@ valid rows until they turn stale.
 
 The watch decodes each message into scratch space and replaces what it shows
 only when the whole message is valid. Integers must be signed or unsigned
-tuples of 1, 2 or 4 bytes within the same ranges, and strings terminated C
-strings within the same bounds. `COLLECTED_AT`, `ROW_COUNT`, `UNAVAILABLE` and
-all seven keys of every counted row are required; `TEMP` is optional. A
-rejected message leaves no partial rows or stale labels behind.
+tuples of 1, 2 or 4 bytes within the phone's ranges, except `TEMP` also accepts
+-2147483648. Strings obey the phone's text bounds and must contain a NUL
+terminator within their declared bytes; a zero-byte tuple is invalid even for
+an empty `UNAVAILABLE` string.
+`COLLECTED_AT`, `ROW_COUNT`, `UNAVAILABLE` and all seven keys of every counted
+row are required; `TEMP` is optional. A rejected message leaves the previous
+display intact.
 
 The largest valid message, five rows with seven-character windows and a
 temperature, takes 437 bytes of the watch's 2,048-byte inbox.
@@ -217,7 +220,7 @@ malformed results fail collection, while valid sibling windows survive bad ones.
 Other provider/snapshot errors use fixed categories such as `HTTPError`, not
 exception messages, URLs, response bodies or credentials.
 
-Installed Codex CLI compatibility is **unverified as of 2026-10-22**. Tests use
+Installed Codex CLI compatibility remains **unverified by this review**. Tests use
 fake app-servers with initialize's `userAgent` result and both wrapped
 `rateLimits` and legacy direct window results. No installed CLI version was
 verified in this check. Deployment/restart evidence belongs to the
@@ -272,10 +275,11 @@ the watch within about 21 minutes.
   than 25 minutes or more than 5 minutes ahead. Home Assistant's two-hour
   entity-age limit above still applies on the host.
 
-Stale state clears only when a message with a newer, valid reading arrives.
-Failed phone requests send nothing, so the watch keeps aging its last rows. The
-first gauge shows `updated Nm ago`, the age of `at`, only while that gauge is
-fresh. The collector keeps timestamps as recorded and never rewrites them to
+Failed phone requests send nothing, so the watch keeps aging its last rows. See
+[phone response ordering] for superseded requests, the bounded timestamp guard
+and deferred AppMessage retries. The first gauge shows `updated Nm ago`, the
+age of `at`, only while that gauge is fresh (`phone sync pending` when `at` is
+zero). The collector keeps timestamps as recorded and never rewrites them to
 the current time. `p` keeps its version 1 meaning for old watches, which still
 color from it and show expired windows; only the new watch bundle applies this
 policy. The [watchface guide] describes rendering and phone refresh triggers.
@@ -326,3 +330,5 @@ does not establish current production configuration or authorize a restart.
 [state timestamp semantics]: https://contributors.home-assistant.io/core/internals/states/
 [watchface guide]: ../watchface/README.md
 [operations proposal]: tasks/12-document-recoverable-operation-and-reconcile-build-release-assumptions.md
+[phone response ordering]: ../watchface/README.md#phone-settings
+[documentation recheck]: reviews/2026-10-25-docs-recheck.md

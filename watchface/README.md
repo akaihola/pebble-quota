@@ -15,34 +15,17 @@ The layout stacks three regions top to bottom:
 
 Each gauge shows the service/window title, used quota over a light-gray remaining
 track, and a white, black-outlined elapsed-time marker. With no rows the face
-shows `Waiting for quota data`. The watch re-judges every row each minute
-against its own clock:
-
-- **Fresh:** the color comes from the current elapsed percentage minus the used
-  percentage, the same elapsed value that places the marker. Green means pace
-  surplus is zero or positive, yellow means -10 through -1 points, and red means
-  below -10.
-- **Stale:** the reading is more than 25 minutes old, its provider's latest
-  attempt failed, or it is more than 5 minutes in the future. The used part
-  turns dark gray, and the title row shows `stale 12m` (or hours, then days) or
-  `clock skew`.
-- **Reset:** the window has reset since the reading. The bar becomes an empty
-  dark track without a marker, and the title row shows `reset ?`.
-- **Unavailable:** a provider without rows gets its own line, for example
-  `Codex` with `unavailable`, over an empty dark track.
-
-The first title row shows `updated Nm ago` or `phone sync pending` while that
-gauge is fresh, and the gauge's own state otherwise. The temperature hides once
-its pass is more than 25 minutes old. Only a newer valid reading clears a stale
-state.
+shows `Waiting for quota data`. Each minute the watch reapplies the
+[display freshness policy], which defines pace colors, stale/reset/unavailable
+labels, sync status and temperature expiry.
 
 When Claude and Fable weekly rows have the same reset time and duration, they
 share two bars separated by 1 px and a single marker computed from Claude's
 row; both bar colors use that shared elapsed value. Otherwise `Fable 7d` gets
 its own line. The face has room for five lines, and the collector sends only as
 many rows as fit beside the unavailable providers' lines; see
-[five gauge lines]. See [collector freshness] for the policy, timestamp
-meaning, temperature validation, and rollout order.
+[five gauge lines]. See the [collector reference] for timestamp meaning,
+temperature validation and rollout order.
 
 The phone drops a payload with an unsupported version or a malformed field and
 logs why; the watch keeps what it shows unless a whole message is valid. Either
@@ -172,7 +155,8 @@ The [release configuration] and [release manifest] are the source of versioning
 settings; their reconciliation and upload-retry procedure remain in the
 [operations proposal]. Collector deployment is outside this workflow.
 
-[collector freshness]: ../docs/collector.md#display-freshness-policy
+[display freshness policy]: ../docs/collector.md#display-freshness-policy
+[collector reference]: ../docs/collector.md
 [five gauge lines]: ../docs/collector.md#five-gauge-lines
 [Phone and watch validation]: ../docs/collector.md#phone-and-watch-validation
 [the gauge module]: src/c/gauges.c

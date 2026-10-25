@@ -17,13 +17,8 @@ PEBBLE_QUOTA_TOKEN='replace-me' python3 collector/pebble_quota.py serve
 `collect` writes a local snapshot and prints the compact payload. `serve`
 refreshes in the background and exposes the API on loopback by default.
 
-The watch has room for five gauge lines. A provider without rows takes one for
-its `unavailable` line. Rows fill the rest: first the core windows (Claude's
-5-hour and weekly, Codex's two windows), which always fit, then scoped extras
-such as Fable, shortest window first. The phone and the watch reject a payload
-or message that breaks this contract as a whole.
-See the [collector guide] for settings, the complete payload schema, retry and
-freshness behavior, and deployment assumptions.
+See the [collector guide] for settings, the payload schema, the five-line
+contract, retry and freshness behavior, and deployment assumptions.
 
 ## Watch face
 
@@ -35,7 +30,7 @@ it. That guide also records the headless-emulator path and release workflow.
 
 ## Tests and status
 
-From the repository root:
+From the repository root with Python 3.11 or newer:
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -46,9 +41,9 @@ ty check
 The suite uses synthetic provider responses, fake subprocesses and loopback HTTP
 servers; it blocks real provider access. Its watch pipeline tests run the phone
 script under Node and compile the watch's message and gauge rules with the host C compiler;
-they are skipped when `node` or `cc` is missing. [Ruff] and [ty] run with their default
-rules, without project configuration, and report no findings; a `noqa: BLE001`
-comment explains each deliberate broad `except`. CI currently builds and checks
+they are skipped when `node` or `cc` is missing. No project configuration is
+provided for [Ruff] or [ty]; a `noqa: BLE001` comment explains each deliberate
+broad `except`. CI currently builds and checks
 the watch bundle but runs neither the suite nor these checks. See the [task
 tracker] for completed work and unverified proposals, and the [documentation
 review] for this source check's findings. Live deployment and installed Codex CLI
@@ -61,4 +56,4 @@ compatibility were not verified by that check.
 [Ruff]: https://docs.astral.sh/ruff/
 [ty]: https://docs.astral.sh/ty/
 [task tracker]: TASKS.md
-[documentation review]: docs/reviews/2026-10-22-docs-review.md
+[documentation review]: docs/reviews/2026-10-25-docs-recheck.md
