@@ -25,3 +25,21 @@ Steward issue, 2026-10-25 02:43 refill (steward decisions D43, D68 and D95). Goa
 - The checks `AGENTS.md` asks for pass before merging. Handoff: a short outcome; details go in the review file and this task record.
 
 Tracker: [pebble-quota's tracker](../../TASKS.md).
+
+## Implementation plan
+
+1. Enumerate source commits after `418b500` and compare their changes with the
+   [project entry point], [agent instructions] and [collector reference]. Read
+   the affected source and tests; keep historical reviews unchanged.
+2. Correct factual discrepancies and replace duplicated explanations with
+   links. Record commit-by-commit coverage, document changes and unresolved
+   questions in the [documentation recheck], ending with draft issues only.
+3. Run the documented offline suite, Ruff and ty sequentially under the memory
+   guard. Check Markdown links, change scope and whitespace. Merge to `main`,
+   record those checks from the clean merged commit, and complete the tracker
+   entry without accepting it.
+
+[project entry point]: ../../README.md
+[agent instructions]: ../../AGENTS.md
+[collector reference]: ../collector.md
+[documentation recheck]: ../reviews/2026-10-25-docs-recheck.md
