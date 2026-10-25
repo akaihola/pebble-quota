@@ -1,0 +1,94 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [29]",
+      "hai_id": "simple-01984467-4ebe-4ac4-bca6-f25d27f9ab34",
+      "title": "Check pebble-quota's documents against the ten source changes since the 10-22 docs review",
+      "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-29-check-pebble-quota-s-documents-against-the-ten-source-changes-si-bb9f6afd",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "81867537275e7c4bb6c6499d76d60d6c3720fa72",
+      "delivery_commits": [
+        "e3ff28a049fcde7413bba0d57f73d0e305b6a6f4"
+      ],
+      "checks": [
+        {
+          "id": "offline-suite",
+          "command": "python3 -m unittest discover -s tests -v",
+          "dependencies": {}
+        },
+        {
+          "id": "ruff",
+          "command": "ruff check .",
+          "dependencies": {}
+        },
+        {
+          "id": "ty",
+          "command": "ty check",
+          "dependencies": {}
+        },
+        {
+          "id": "documentation",
+          "command": "python3 /home/agent/.local/state/kandev-pacer/t3/evidence/pebble-quota-29-docs-check.py",
+          "dependencies": {
+            "documentation_check": {
+              "kind": "sha256",
+              "path": "/home/agent/.local/state/kandev-pacer/t3/evidence/pebble-quota-29-docs-check.py"
+            }
+          }
+        }
+      ],
+      "evidence": {
+        "offline-suite": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-29-check-pebble-quota-s-documents-against-the-ten-source-changes-si-bb9f6afd",
+          "tested_commit": "e3ff28a049fcde7413bba0d57f73d0e305b6a6f4",
+          "dependencies": {},
+          "issue": "pebble-quota [29]",
+          "check": "offline-suite",
+          "command": "python3 -m unittest discover -s tests -v",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-25T00:07:02.733327+00:00"
+        },
+        "ruff": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-29-check-pebble-quota-s-documents-against-the-ten-source-changes-si-bb9f6afd",
+          "tested_commit": "e3ff28a049fcde7413bba0d57f73d0e305b6a6f4",
+          "dependencies": {},
+          "issue": "pebble-quota [29]",
+          "check": "ruff",
+          "command": "ruff check .",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-25T00:07:16.414666+00:00"
+        },
+        "ty": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-29-check-pebble-quota-s-documents-against-the-ten-source-changes-si-bb9f6afd",
+          "tested_commit": "e3ff28a049fcde7413bba0d57f73d0e305b6a6f4",
+          "dependencies": {},
+          "issue": "pebble-quota [29]",
+          "check": "ty",
+          "command": "ty check",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-25T00:07:16.751162+00:00"
+        },
+        "documentation": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-29-check-pebble-quota-s-documents-against-the-ten-source-changes-si-bb9f6afd",
+          "tested_commit": "e3ff28a049fcde7413bba0d57f73d0e305b6a6f4",
+          "dependencies": {
+            "documentation_check": {
+              "kind": "sha256",
+              "path": "/home/agent/.local/state/kandev-pacer/t3/evidence/pebble-quota-29-docs-check.py",
+              "value": "e59c51a194bc2809b3bc31453080c77bb05df7816dd20c3e14a1ddf4b17050fe"
+            }
+          },
+          "issue": "pebble-quota [29]",
+          "check": "documentation",
+          "command": "python3 /home/agent/.local/state/kandev-pacer/t3/evidence/pebble-quota-29-docs-check.py",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-25T00:07:17.055630+00:00"
+        }
+      }
+    }
+  ]
+}

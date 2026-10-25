@@ -93,9 +93,53 @@ receipt. Memory figures describe the host, not individual process usage.
 
 - **pre-final-docs:** `python3 "$DOCS_CHECK"` — started at once; wait 0.0 s; MemAvailable admission/final 57700.9/57699.9 MiB; starting swap 0.5 MiB, growth 0.0 MiB; elapsed 0.1 s; exit 0.
 
+
+## Merged validation and delivery
+
+Base commit: `81867537275e7c4bb6c6499d76d60d6c3720fa72`. Merged commit:
+`e3ff28a049fcde7413bba0d57f73d0e305b6a6f4`. Delivery commits, oldest first:
+
+- `e3ff28a049fcde7413bba0d57f73d0e305b6a6f4`
+
+All four recorded checks passed from a clean detached task checkout at the
+merged commit; the shared checkout stayed on `main`. The [check receipt]
+contains the tested commit, commands, results and dependency fingerprints.
+The project has no lockfile or editable local dependencies. Only the external
+documentation checker needs a SHA-256 dependency declaration.
+
+- **Offline suite:** `python3 -m unittest discover -s tests -v` — exit 0;
+  106 tests, no failures/errors/skips, with Node and the host C compiler present.
+- **Ruff:** `ruff check .` — exit 0, no findings.
+- **ty:** `ty check` — exit 0, no findings.
+- **Documentation:** `python3 "$DOCS_CHECK"` — exit 0; six documents,
+  59 local links/anchors, ten commits, synthetic payload, permitted scope,
+  historical preservation and whitespace.
+
+## Memory reports for recording
+
+Each invocation was `uv run "$CHECK_EVIDENCE" record "$RECEIPT"
+'pebble-quota [29]' <check>`, where the variables identify the steward recorder
+and external declaration. Logs and declaration stayed outside the clean
+checkout. Commands ran sequentially with five-minute timeouts and process-group
+cleanup; no memory stop or fallback was needed.
+
+- **Record offline-suite:** started at once; wait 0.0 s; MemAvailable admission/final 57696.3/57669.3 MiB; starting swap 0.5 MiB, growth 0.0 MiB; elapsed 14.38 s; exit 0.
+- **Record ruff:** started at once; wait 0.0 s; MemAvailable admission/final 57679.3/57662.1 MiB; starting swap 0.5 MiB, growth 0.0 MiB; elapsed 0.1 s; exit 0.
+- **Record ty:** started at once; wait 0.0 s; MemAvailable admission/final 57651.9/57654.5 MiB; starting swap 0.5 MiB, growth 0.0 MiB; elapsed 0.3 s; exit 0.
+- **Record documentation:** started at once; wait 0.0 s; MemAvailable admission/final 57646.9/57635.4 MiB; starting swap 0.5 MiB, growth 0.0 MiB; elapsed 0.2 s; exit 0.
+
+The receipt and this record were left uncommitted for the completion move to
+commit together with the tracker. No intervening commit was made after the
+merge. The branch and worktree are retained. No failed, skipped or stopped
+acceptance checks, unfinished documentation work or owner action remains.
+The two draft code candidates belong to the steward; no issues were filed.
+Acceptance stays unchecked.
+
 [project entry point]: ../../README.md
 [agent instructions]: ../../AGENTS.md
 [collector reference]: ../collector.md
 [documentation recheck]: ../reviews/2026-10-25-docs-recheck.md
 
 [watchface guide]: ../../watchface/README.md
+
+[check receipt]: 29-check-pebble-quota-s-documents-against-the-ten-source-changes-since-th.evidence.json
