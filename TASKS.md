@@ -17,11 +17,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+## Scheduled
+
 - [29] Check pebble-quota's documents against the ten source changes since the
   10-22 docs review
-  <!-- hai:{"id":"simple-01984467-4ebe-4ac4-bca6-f25d27f9ab34","labels":["steward","review"],"createdAt":"2026-10-24T23:50:27.223Z","updatedAt":"2026-10-24T23:50:27.223Z"} -->
-
-## Scheduled
+  <!-- hai:{"id":"simple-01984467-4ebe-4ac4-bca6-f25d27f9ab34","labels":["steward","review"],"createdAt":"2026-10-24T23:50:27.223Z","updatedAt":"2026-10-25T00:00:11.964Z"} -->
 
 ## In Progress
 
