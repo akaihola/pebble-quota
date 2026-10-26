@@ -154,6 +154,13 @@ Codex, and optional `temperature_c_tenths` / `temperature_error`. Service
 Scheduling and error fields remain in this file. Compact output derives only
 `o`, `e` and `n` from them.
 
+Claude's usage request includes `cedar_ember=1&skip_spend=1`. The snapshot's
+`cedar_ember` block keeps only eligibility, the next grant ID and the grant
+fields needed by [kandev-pacer] to plan banked resets. Other provider fields are
+discarded. This lets the pacer share the collector's quota poll; grant metadata
+stays outside compact phone/watch output. Missing grant metadata identifies an
+older snapshot; an explicit empty block means no usable grants were reported.
+
 Quota windows are validated individually on collection and every snapshot read:
 
 - **Usage:** finite JSON numbers in `[0, 1]`; provider percentages in `[0, 100]`.
@@ -332,3 +339,5 @@ does not establish current production configuration or authorize a restart.
 [operations proposal]: tasks/12-document-recoverable-operation-and-reconcile-build-release-assumptions.md
 [phone response ordering]: ../watchface/README.md#phone-settings
 [documentation recheck]: reviews/2026-10-25-docs-recheck.md
+
+[kandev-pacer]: http://hopeli/prg/kandev-pacer/?f

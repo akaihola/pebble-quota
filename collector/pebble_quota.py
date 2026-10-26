@@ -26,7 +26,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 DURATIONS = {300: "5h", 10_080: "7d"}
-CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1"
 CLAUDE_BACKOFF_SECONDS = 600
 CLAUDE_MAX_BACKOFF_SECONDS = 3600
 CODEX_RPC_TIMEOUT_SECONDS = 15
@@ -132,6 +132,25 @@ def normalize_window(name: str, label: Any, item: Any) -> dict[str, Any] | None:
     return {"used_fraction": used, "resets_at": reset, "duration_seconds": duration}
 
 
+def claude_grants(value: Any) -> dict[str, Any]:
+    """Keep reset metadata for local consumers, without unrelated provider fields."""
+    block = value if isinstance(value, dict) else {}
+    result: dict[str, Any] = {"eligible": block.get("eligible") is True, "grants": []}
+    if isinstance(block.get("next_grant_id"), str):
+        result["next_grant_id"] = block["next_grant_id"]
+    grants = block.get("grants")
+    if isinstance(grants, list):
+        for grant in grants:
+            if isinstance(grant, dict):
+                result["grants"].append({
+                    key: item for key, item in grant.items()
+                    if key in {"id", "resets_left", "paused", "usable_now", "ends_at",
+                               "offer_type", "reset_type"}
+                    and type(item) in (str, int, bool, type(None))
+                })
+    return result
+
+
 def normalize_snapshot(data: Any) -> dict[str, Any]:
     """Untrusted disk/provider input -> usable rows and safe scheduling metadata."""
     if not isinstance(data, dict):
@@ -148,6 +167,8 @@ def normalize_snapshot(data: Any) -> dict[str, Any]:
             continue
         service: dict[str, Any] = {}
         result["services"][name] = service
+        if name == "claude" and "cedar_ember" in source:
+            service["cedar_ember"] = claude_grants(source["cedar_ember"])
         if source.get("service") == name:
             service["service"] = name
         for field in ("last_attempt_at", "last_success_at", "retry_at"):
@@ -273,7 +294,8 @@ def collect_claude() -> dict[str, Any]:
     if not isinstance(raw, dict):
         return {"service": "claude", "windows": {}}
     if windows := claude_windows_from_limits(raw.get("limits")):
-        return {"service": "claude", "windows": windows}
+        return {"service": "claude", "windows": windows,
+                "cedar_ember": claude_grants(raw.get("cedar_ember"))}
     windows = {}
     for source, name, seconds in (
         ("five_hour", "5h", 18_000),
@@ -285,7 +307,8 @@ def collect_claude() -> dict[str, Any]:
                 "resets_at": item.get("resets_at"),
                 "duration_seconds": seconds,
             }
-    return {"service": "claude", "windows": windows}
+    return {"service": "claude", "windows": windows,
+            "cedar_ember": claude_grants(raw.get("cedar_ember"))}
 
 
 def codex_service_from_result(result: Any) -> dict[str, Any]:

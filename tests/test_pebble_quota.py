@@ -673,6 +673,31 @@ class ClaudeCollectTests(unittest.TestCase):
             ):
                 return quota.collect_claude()
 
+    def test_grants_share_the_quota_poll_and_survive_normalization(self) -> None:
+        grant = {"id": "grant", "resets_left": 2, "usable_now": True,
+                 "paused": False, "ends_at": "2026-12-01T00:00:00Z"}
+        block = {"eligible": True, "next_grant_id": "grant", "grants": [grant]}
+        payload = {"limits": self.LIMITS, "cedar_ember": block}
+        for windows in (payload, {"five_hour": {"utilization": 5,
+                        "resets_at": "2026-08-03T22:59:59Z"}, "cedar_ember": block}):
+            with self.subTest(payload=windows):
+                service = self._collect(windows)
+                normalized = quota.normalize_snapshot({"services": {"claude": service}})
+                self.assertEqual(normalized["services"]["claude"]["cedar_ember"], block)
+
+    def test_grant_metadata_keeps_only_allowed_fields(self) -> None:
+        block = {"eligible": True, "next_grant_id": "grant", "token": "private",
+                 "grants": [{"id": "grant", "resets_left": 1,
+                             "usable_now": True, "token": "private",
+                             "ends_at": {"token": "private"}}]}
+        service = self._collect({"limits": self.LIMITS, "cedar_ember": block})
+        normalized = quota.normalize_snapshot({"services": {"claude": service}})
+        self.assertEqual(normalized["services"]["claude"]["cedar_ember"], {
+            "eligible": True, "next_grant_id": "grant",
+            "grants": [{"id": "grant", "resets_left": 1, "usable_now": True}],
+        })
+        self.assertNotIn("private", json.dumps(service))
+
     def test_limits_percentages(self) -> None:
         for percent, expected in ((0, 0.0), (1, 0.01), (100, 1.0)):
             with self.subTest(percent=percent):
