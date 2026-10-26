@@ -1,0 +1,3 @@
+Request Claude reset grant metadata with the existing usage poll and preserve only the grant fields consumed by kandev-pacer through snapshot normalization. Never publish unrelated provider fields.
+
+Keep the existing quota windows, stale handling and 429 retry scheduling. Add offline tests for collection, normalization and recovery so the pacer can share this one Claude poll without losing reset support.
