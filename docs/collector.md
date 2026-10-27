@@ -54,7 +54,8 @@ GET /config
 ```
 
 `/config` serves the static phone settings page without authentication so a fresh
-install can configure its service token. See [phone settings] for the URL,
+install can configure its service token. Only watchface versions up to 0.2.0 open
+it; from 0.3.0 the page ships in the phone script. See [phone settings] for
 storage and recovery limitations. `/v1/watch` requires an exact bearer token
 (401 otherwise); unknown paths return 404. An unreadable, corrupt, rowless or
 invalidly timestamped snapshot returns 503 `Snapshot unavailable`. Valid rows

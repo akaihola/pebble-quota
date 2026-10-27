@@ -1,11 +1,16 @@
-// The phone cannot reach gogo through its loopback interface. Keep the tailnet
-// endpoint as the default; saved phone settings in localStorage override it.
-var DEFAULT_ENDPOINT = "https://gogo.crane-boa.ts.net:8450/v1/watch";
+// The phone cannot reach the collector host through its loopback interface. Keep
+// the tailnet URL as the default; saved phone settings in localStorage override it.
+var DEFAULT_COLLECTOR = "https://tinni.crane-boa.ts.net:8450";
 var DEFAULT_TOKEN = "test-only-token";
 var REFRESH_MS = 15 * 60 * 1000;
 
 function setting(name, fallback) {
   return localStorage.getItem(name) || fallback;
+}
+
+// Up to 0.2.0 the saved "endpoint" was the full /v1/watch URL; accept both forms.
+function collectorUrl() {
+  return setting("endpoint", DEFAULT_COLLECTOR).replace(/(\/v1\/watch)?\/?$/, "");
 }
 
 // Wire limits shared with the collector and the watch; see docs/collector.md.
@@ -82,7 +87,7 @@ function sendQuota(message) {
 
 function refresh() {
   var sequence = ++refreshSequence;
-  var endpoint = setting("endpoint", DEFAULT_ENDPOINT);
+  var endpoint = collectorUrl() + "/v1/watch";
   var token = setting("token", DEFAULT_TOKEN);
   if (endpoint !== currentEndpoint || token !== currentToken) {
     lastCollectedAt = undefined;
@@ -129,11 +134,34 @@ function refresh() {
   request.send();
 }
 
+// The settings page ships inside the watchface as a data: URL, so it opens even
+// when the saved collector is unreachable. Save closes the webview with the
+// values as JSON. A blank token keeps the saved one, so the page never holds it.
 function configUrl() {
-  var endpoint = setting("endpoint", DEFAULT_ENDPOINT);
-  var base = endpoint.replace(/\/v1\/watch\/?$/, "");
-  return base + "/config?endpoint=" + encodeURIComponent(endpoint)
-    + "&token=" + encodeURIComponent(setting("token", DEFAULT_TOKEN));
+  // Escape "<" so a saved value cannot close the script element.
+  var saved = JSON.stringify(collectorUrl()).replace(/</g, "\\u003c");
+  var page = [
+    '<!doctype html><html><head><meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<title>Quota Pace settings</title>',
+    '<style>body{font-family:sans-serif;margin:1em}label{display:block;margin:0 0 1em}',
+    'input{width:100%;box-sizing:border-box;font-size:1em;margin-top:.25em}',
+    'button{font-size:1.1em;padding:.5em 1.5em}</style></head><body>',
+    '<label>Collector URL<input id="endpoint" type="url" autocapitalize="off"></label>',
+    '<label>Token<input id="token" type="text" autocapitalize="off" autocomplete="off"',
+    ' placeholder="blank keeps the saved token"></label>',
+    '<button id="save">Save</button>',
+    '<script>',
+    'var endpoint = document.getElementById("endpoint");',
+    'var token = document.getElementById("token");',
+    'endpoint.value = ' + saved + ';',
+    'document.getElementById("save").addEventListener("click", function () {',
+    '  var settings = {endpoint: endpoint.value.trim(), token: token.value.trim()};',
+    '  document.location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(settings));',
+    '});',
+    '</script></body></html>'
+  ].join("\n");
+  return "data:text/html;charset=utf-8," + encodeURIComponent(page);
 }
 
 Pebble.addEventListener("showConfiguration", function () {

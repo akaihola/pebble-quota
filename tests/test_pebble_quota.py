@@ -16,6 +16,7 @@ import tempfile
 import threading
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from email.message import Message
 from pathlib import Path
@@ -2041,6 +2042,49 @@ class PhoneContractTests(WatchTools):
                        for value in message.values())
         self.assertEqual(size, 437)
         self.assertLessEqual(size, 2048)  # app_message_open's inbox
+
+
+class PhoneSettingsTests(WatchTools):
+    """Settings open without the collector, and a saved collector URL feeds the watch."""
+
+    AT = 1_800_000_000
+    OLD: ClassVar[dict[str, str]] = {"endpoint": "https://gone.example:8450/v1/watch", "token": "secret-token"}
+    PAYLOAD: ClassVar[dict[str, Any]] = {
+        "v": 1, "at": AT, "q": [{"s": "C", "w": "5h", "u": 20, "r": AT + 3600, "d": 18_000}]}
+
+    def test_settings_page_is_bundled_and_leaves_out_the_token(self):
+        [url] = self.phone_run({"saved": self.OLD, "steps": [{"event": "showConfiguration"}]})["opened"]
+        prefix = "data:text/html;charset=utf-8,"
+        self.assertTrue(url.startswith(prefix), url[:40])
+        page = urllib.parse.unquote(url.removeprefix(prefix))
+        self.assertIn('<input id="endpoint"', page)
+        self.assertIn('<input id="token"', page)
+        self.assertIn('endpoint.value = "https://gone.example:8450";', page)
+        self.assertIn('"pebblejs://close#"', page)
+        self.assertNotIn("secret-token", page)
+
+    def test_saved_collector_url_reaches_the_watch(self):
+        for decoded in (False, True):
+            with self.subTest(decoded=decoded):
+                result = self.phone_run({"saved": self.OLD, "steps": [
+                    {"event": "config", "decoded": decoded,
+                     "settings": {"endpoint": "https://new.example:8450", "token": ""}},
+                    {"request": 0, "status": 200, "body": json.dumps(self.PAYLOAD)}]})
+                self.assertEqual(result["requests"], [{
+                    "url": "https://new.example:8450/v1/watch",
+                    "headers": {"Authorization": "Bearer secret-token"}}])
+                [message] = result["sent"]
+                self.assertEqual((message["COLLECTED_AT"], message["U0"]), (self.AT, 20))
+
+    def test_default_legacy_and_trailing_slash_urls_fetch_v1_watch(self):
+        for saved, url in [
+            ({}, "https://tinni.crane-boa.ts.net:8450/v1/watch"),
+            ({"endpoint": "https://old.example:8450/v1/watch/"}, "https://old.example:8450/v1/watch"),
+            ({"endpoint": "https://old.example:8450/"}, "https://old.example:8450/v1/watch"),
+        ]:
+            with self.subTest(saved=saved):
+                result = self.phone_run({"saved": saved, "steps": [{"event": "ready"}]})
+                self.assertEqual(result["requests"][0]["url"], url)
 
 
 class WatchDecodeTests(WatchTools):

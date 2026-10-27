@@ -1,6 +1,7 @@
 // node phone.js <index.js> < fixture.json
 // A single {status, body}/{error} completes ready immediately. A {steps: [...]}
 // fixture emits events and completes indexed requests in any chosen order.
+// An optional "saved" object seeds localStorage.
 "use strict";
 const fs = require("fs");
 const vm = require("vm");
@@ -11,8 +12,9 @@ const requests = [];
 const sent = [];
 const log = [];
 const delivered = [];
-const settings = {};
+const settings = Object.assign({}, response.saved);
 const requestDetails = [];
+const opened = [];
 let interval;
 let now = 0;
 let failMessages = 0;
@@ -51,7 +53,7 @@ const context = vm.createContext({
         onSent();
       }
     },
-    openURL: function () {},
+    openURL: function (url) { opened.push(url); },
   },
 });
 vm.runInContext(fs.readFileSync(process.argv[2], "utf8"), context);
@@ -73,7 +75,9 @@ if (response.steps) {
     if ("failMessages" in step) failMessages = step.failMessages;
     if (step.event === "timer") interval();
     else if (step.event === "config") {
-      listeners.webviewclosed({ response: encodeURIComponent(JSON.stringify(step.settings)) });
+      // The original Pebble app passes the close payload encoded; the Core app decodes it first.
+      const json = JSON.stringify(step.settings);
+      listeners.webviewclosed({ response: step.decoded ? json : encodeURIComponent(json) });
     } else if (step.event === "watch") listeners.appmessage({ payload: { REQUEST_SYNC: 1 } });
     else if (step.event) listeners[step.event]();
     if ("request" in step) complete(requests[step.request], step);
@@ -82,4 +86,4 @@ if (response.steps) {
   listeners.ready();
   complete(requests[0], response);
 }
-process.stdout.write(JSON.stringify({ sent, log, delivered, requests: requestDetails }));
+process.stdout.write(JSON.stringify({ sent, log, delivered, requests: requestDetails, opened }));
