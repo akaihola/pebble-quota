@@ -1,0 +1,114 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [32]",
+      "hai_id": "simple-c4c53ed6-204b-4631-9e72-547b47031a87",
+      "title": "Recover retained runtime evidence for reset-grant snapshots",
+      "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-32-recover-retained-runtime-evidence-for-reset-grant-snapshots-c2f2f87a",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "61a035f991a37e7857664a0aa2275c36a354471e",
+      "delivery_commits": [
+        "48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c"
+      ],
+      "checks": [
+        {
+          "id": "scope-whitespace",
+          "command": "python3 - <<'PY'\nimport subprocess\nbase='61a035f991a37e7857664a0aa2275c36a354471e'; delivery='48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'\npaths=subprocess.check_output(['git','diff','--name-only',base,delivery],text=True).splitlines()\nassert set(paths)=={'docs/reviews/2026-10-28-reset-grant-retention.md','docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md'},paths\nsubprocess.run(['git','diff','--check',base,delivery],check=True)\nfor path in ['TASKS.md','docs/tasks/30-include-claude-reset-grants-in-quota-snapshots.md']:\n    assert subprocess.check_output(['git','show',base+':'+path])==subprocess.check_output(['git','show',delivery+':'+path])\nassert not subprocess.check_output(['git','diff','--name-only','75dec32cc7db0f9432b6ae999c4aaf32fbc2e778',delivery,'--','collector','tests','docs/collector.md'])\nprint('PASS: documentation-only delivery, whitespace clean, original task and reviewed source unchanged')\nPY",
+          "dependencies": {}
+        },
+        {
+          "id": "document-links",
+          "command": "python3 - <<'PY'\nimport posixpath,re,subprocess\nrevision='48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'\nfor path in ['docs/reviews/2026-10-28-reset-grant-retention.md','docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md']:\n    text=subprocess.check_output(['git','show',revision+':'+path],text=True)\n    prose=re.sub(r'```.*?```','',text,flags=re.S)\n    assert all(len(line.lstrip('# '))<=60 for line in prose.splitlines() if line.startswith('#'))\n    assert not re.search(r'\\[[^\\]]+\\]\\([^\\)]+\\)',prose)\n    definitions={re.sub(r'\\s+',' ',label).lower():target for label,target in re.findall(r'^\\[([^\\]]+)\\]:\\s+(\\S+)',text,re.M)}\n    body=re.sub(r'^\\[[^\\]]+\\]:.*$','',prose,flags=re.M)\n    for label in re.findall(r'\\[([^\\]]+)\\]',body):\n        assert re.sub(r'\\s+',' ',label).lower() in definitions,label\n    for target in definitions.values():\n        if '://' not in target:\n            resolved=posixpath.normpath(posixpath.join(posixpath.dirname(path),target.split('#')[0]))\n            subprocess.run(['git','cat-file','-e',revision+':'+resolved],check=True)\n    assert 'Cause unresolved' in text\nprint('PASS: pinned documents have resolving references, reference-style links, short headings and an unresolved conclusion')\nPY",
+          "dependencies": {}
+        },
+        {
+          "id": "evidence-consistency",
+          "command": "python3 - <<'PY'\nimport hashlib,json,subprocess\nfrom pathlib import Path\nfrom datetime import datetime\nroot=Path('/home/agent/tmp/hai32')\na=json.loads((root/'inventory-summary.json').read_text())\nb=json.loads((root/'retention-summary.json').read_text())\nreport=subprocess.check_output(['git','show','48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'+':'+'docs/reviews/2026-10-28-reset-grant-retention.md'],text=True)\ntask=subprocess.check_output(['git','show','48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'+':'+'docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md'],text=True)\nfor row in a['journals'].values():\n    assert row['exit']==0 and row['counts']=={'records':115,'attempt':107,'skip':8}\n    assert row['outcomes']=={'ok':99,'429':8} and row['skips']=={'retry_at':8}\n    assert row['first']=='2026-10-28T09:53:57.778418+00:00'\n    assert row['last']=='2026-10-28T19:26:14.544241+00:00'\n    assert row['max_gap_seconds']==602.437567\n    assert len(row['failures'])==8 and all(x['outcome']=='429' for x in row['failures'])\nassert '107 requests = 99 ok + 8 HTTP 429' in report and '8 retry_at skips' in report\nassert a['series'][0]['counts']=={'lines':285,'no_claude_error':112,'other_error':16}\nassert a['series'][1]['counts']=={'lines':250,'no_claude_error':87,'other_error':7}\nassert '128 samples' in report and '94' in report and '112 without a Claude error and 16' in report\nfor name,record in a['saved'].items():\n    assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==record['sha256']\n    if 'observed' in record:\n        assert record['collector']['last_success_at']=='2026-10-26T17:11:52.541622+00:00'\n        assert record['grant_metadata'] and record['quota_available']\n        assert record['collector']['retry_at'] is None\nassert sum(j['readable'] for j in b['journals'])==2\nassert any(j['path'].endswith('/system.journal') and not j['readable'] for j in b['journals'])\nassert 'unknown' in report and 'worker summaries' in report and 'snapshot samples' in report\npacket=Path('/home/agent/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.evidence.json')\nold=next(i for i in json.loads(packet.read_text())['items'] if i['issue']=='pebble-quota [30]')\nfor name in ['offline-suite','grant-regression','ruff','ty','whitespace','scope','revert-policy','journal-inventory']:\n    assert old['evidence'][name]['result']=='pass' and old['evidence'][name]['exit_code']==0\nassert old['evidence']['journal-coverage']['result']=='fail'\nassert old['verdict']=='needs a fix'\nfor p in [root/'inventory-summary.json',root/'retention-summary.json',packet,Path('/tmp/kandev-quota-deploy.json'),Path('/tmp/kandev-quota-live-verification.json')]:\n    assert hashlib.sha256(p.read_bytes()).hexdigest() in task\nprint('PASS: report aggregates and provenance agree with frozen summaries; original historical failure and hold remain explicit')\nPY",
+          "dependencies": {
+            "input_0": {
+              "kind": "sha256",
+              "path": "/home/agent/tmp/hai32/inventory-summary.json"
+            },
+            "input_1": {
+              "kind": "sha256",
+              "path": "/home/agent/tmp/hai32/retention-summary.json"
+            },
+            "input_2": {
+              "kind": "sha256",
+              "path": "/home/agent/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.evidence.json"
+            },
+            "input_3": {
+              "kind": "sha256",
+              "path": "/tmp/kandev-quota-deploy.json"
+            },
+            "input_4": {
+              "kind": "sha256",
+              "path": "/tmp/kandev-quota-live-verification.json"
+            }
+          }
+        }
+      ],
+      "evidence": {
+        "scope-whitespace": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-32-recover-retained-runtime-evidence-for-reset-grant-snapshots-c2f2f87a",
+          "tested_commit": "48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c",
+          "dependencies": {},
+          "issue": "pebble-quota [32]",
+          "check": "scope-whitespace",
+          "command": "python3 - <<'PY'\nimport subprocess\nbase='61a035f991a37e7857664a0aa2275c36a354471e'; delivery='48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'\npaths=subprocess.check_output(['git','diff','--name-only',base,delivery],text=True).splitlines()\nassert set(paths)=={'docs/reviews/2026-10-28-reset-grant-retention.md','docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md'},paths\nsubprocess.run(['git','diff','--check',base,delivery],check=True)\nfor path in ['TASKS.md','docs/tasks/30-include-claude-reset-grants-in-quota-snapshots.md']:\n    assert subprocess.check_output(['git','show',base+':'+path])==subprocess.check_output(['git','show',delivery+':'+path])\nassert not subprocess.check_output(['git','diff','--name-only','75dec32cc7db0f9432b6ae999c4aaf32fbc2e778',delivery,'--','collector','tests','docs/collector.md'])\nprint('PASS: documentation-only delivery, whitespace clean, original task and reviewed source unchanged')\nPY",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-28T20:16:46.875209+00:00"
+        },
+        "document-links": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-32-recover-retained-runtime-evidence-for-reset-grant-snapshots-c2f2f87a",
+          "tested_commit": "48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c",
+          "dependencies": {},
+          "issue": "pebble-quota [32]",
+          "check": "document-links",
+          "command": "python3 - <<'PY'\nimport posixpath,re,subprocess\nrevision='48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'\nfor path in ['docs/reviews/2026-10-28-reset-grant-retention.md','docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md']:\n    text=subprocess.check_output(['git','show',revision+':'+path],text=True)\n    prose=re.sub(r'```.*?```','',text,flags=re.S)\n    assert all(len(line.lstrip('# '))<=60 for line in prose.splitlines() if line.startswith('#'))\n    assert not re.search(r'\\[[^\\]]+\\]\\([^\\)]+\\)',prose)\n    definitions={re.sub(r'\\s+',' ',label).lower():target for label,target in re.findall(r'^\\[([^\\]]+)\\]:\\s+(\\S+)',text,re.M)}\n    body=re.sub(r'^\\[[^\\]]+\\]:.*$','',prose,flags=re.M)\n    for label in re.findall(r'\\[([^\\]]+)\\]',body):\n        assert re.sub(r'\\s+',' ',label).lower() in definitions,label\n    for target in definitions.values():\n        if '://' not in target:\n            resolved=posixpath.normpath(posixpath.join(posixpath.dirname(path),target.split('#')[0]))\n            subprocess.run(['git','cat-file','-e',revision+':'+resolved],check=True)\n    assert 'Cause unresolved' in text\nprint('PASS: pinned documents have resolving references, reference-style links, short headings and an unresolved conclusion')\nPY",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-28T20:16:51.736804+00:00"
+        },
+        "evidence-consistency": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-32-recover-retained-runtime-evidence-for-reset-grant-snapshots-c2f2f87a",
+          "tested_commit": "48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c",
+          "dependencies": {
+            "input_0": {
+              "kind": "sha256",
+              "path": "/home/agent/tmp/hai32/inventory-summary.json",
+              "value": "87acf3e8d21982454d4e60df33c4b8dcd6fb94ab8e8db1ecfac7aa009b4b86b9"
+            },
+            "input_1": {
+              "kind": "sha256",
+              "path": "/home/agent/tmp/hai32/retention-summary.json",
+              "value": "3748021220769b36743a55de86c656376a680d80d5a3684a914cdeaf972d3313"
+            },
+            "input_2": {
+              "kind": "sha256",
+              "path": "/home/agent/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.evidence.json",
+              "value": "ddcab8b9a3516b13355b628e7eb8f9d16a7985d5420b687b682375307bc046e9"
+            },
+            "input_3": {
+              "kind": "sha256",
+              "path": "/tmp/kandev-quota-deploy.json",
+              "value": "725467673bcee9488219d03c88af0184a22a9cbc6b84e2d9259d9dbf10aa2858"
+            },
+            "input_4": {
+              "kind": "sha256",
+              "path": "/tmp/kandev-quota-live-verification.json",
+              "value": "3c98e76ff6221763e3c3ed74b6dcb1a78949457a135fc4e7abb27eedec2245ef"
+            }
+          },
+          "issue": "pebble-quota [32]",
+          "check": "evidence-consistency",
+          "command": "python3 - <<'PY'\nimport hashlib,json,subprocess\nfrom pathlib import Path\nfrom datetime import datetime\nroot=Path('/home/agent/tmp/hai32')\na=json.loads((root/'inventory-summary.json').read_text())\nb=json.loads((root/'retention-summary.json').read_text())\nreport=subprocess.check_output(['git','show','48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'+':'+'docs/reviews/2026-10-28-reset-grant-retention.md'],text=True)\ntask=subprocess.check_output(['git','show','48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'+':'+'docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md'],text=True)\nfor row in a['journals'].values():\n    assert row['exit']==0 and row['counts']=={'records':115,'attempt':107,'skip':8}\n    assert row['outcomes']=={'ok':99,'429':8} and row['skips']=={'retry_at':8}\n    assert row['first']=='2026-10-28T09:53:57.778418+00:00'\n    assert row['last']=='2026-10-28T19:26:14.544241+00:00'\n    assert row['max_gap_seconds']==602.437567\n    assert len(row['failures'])==8 and all(x['outcome']=='429' for x in row['failures'])\nassert '107 requests = 99 ok + 8 HTTP 429' in report and '8 retry_at skips' in report\nassert a['series'][0]['counts']=={'lines':285,'no_claude_error':112,'other_error':16}\nassert a['series'][1]['counts']=={'lines':250,'no_claude_error':87,'other_error':7}\nassert '128 samples' in report and '94' in report and '112 without a Claude error and 16' in report\nfor name,record in a['saved'].items():\n    assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==record['sha256']\n    if 'observed' in record:\n        assert record['collector']['last_success_at']=='2026-10-26T17:11:52.541622+00:00'\n        assert record['grant_metadata'] and record['quota_available']\n        assert record['collector']['retry_at'] is None\nassert sum(j['readable'] for j in b['journals'])==2\nassert any(j['path'].endswith('/system.journal') and not j['readable'] for j in b['journals'])\nassert 'unknown' in report and 'worker summaries' in report and 'snapshot samples' in report\npacket=Path('/home/agent/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.evidence.json')\nold=next(i for i in json.loads(packet.read_text())['items'] if i['issue']=='pebble-quota [30]')\nfor name in ['offline-suite','grant-regression','ruff','ty','whitespace','scope','revert-policy','journal-inventory']:\n    assert old['evidence'][name]['result']=='pass' and old['evidence'][name]['exit_code']==0\nassert old['evidence']['journal-coverage']['result']=='fail'\nassert old['verdict']=='needs a fix'\nfor p in [root/'inventory-summary.json',root/'retention-summary.json',packet,Path('/tmp/kandev-quota-deploy.json'),Path('/tmp/kandev-quota-live-verification.json')]:\n    assert hashlib.sha256(p.read_bytes()).hexdigest() in task\nprint('PASS: report aggregates and provenance agree with frozen summaries; original historical failure and hold remain explicit')\nPY",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-10-28T20:16:55.635215+00:00"
+        }
+      }
+    }
+  ]
+}

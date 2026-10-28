@@ -339,3 +339,150 @@ future scoped work, not performed or requested from the owner here.
 [the sanitized outcome inventory]: http://hopeli/tmp/hai32/inventory-summary.json?f
 [the retention inventory]: http://hopeli/tmp/hai32/retention-summary.json?f
 [the independent receipt]: http://hopeli/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.evidence.json?f
+
+
+## Merged delivery and integrity receipt
+
+The report and task record are merged on `main`. Branch and clean detached
+worktree are retained. The [integrity receipt] records three passing checks
+at the delivery commit; these validate this investigation's documentation,
+not the original delivery's runtime acceptance. No project lockfile or editable
+local dependency applies to these stdlib/documentation checks. Five saved
+input files are fingerprinted with SHA-256 for the evidence consistency check.
+
+Base: `61a035f991a37e7857664a0aa2275c36a354471e`. Delivery commits, oldest first: `48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c`.
+
+Recorded at merged commit `48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c`:
+
+- **scope-whitespace:** pass, exit 0, at `2026-10-28T20:16:46.875209+00:00`.
+- **document-links:** pass, exit 0, at `2026-10-28T20:16:51.736804+00:00`.
+- **evidence-consistency:** pass, exit 0, at `2026-10-28T20:16:55.635215+00:00`.
+
+The scope check preserves the original task and tracker at delivery, confirms
+that collector/tests match the independently verified version, and checks
+whitespace. The document check resolves repository-relative links at the
+pinned delivery and checks reference style/headings. The evidence check
+reconciles counts and timestamps with the saved inventories and original
+summaries and explicitly retains the earlier historical coverage failure.
+
+### Recorded commands
+
+All commands use literal delivery/base hashes so later tracker/receipt edits
+cannot enlarge their scope. The declarations and logs stayed outside the
+clean checkout. Each command below was run once through the recorder:
+
+```bash
+uv run /home/agent/my-knowledge/agents/steward/scripts/check-evidence.py record /home/agent/.local/state/kandev-pacer/t3/evidence/9095fd36029075a94cf4c6751d01646c27a1c4246964f038f33218d70001d64a.evidence.json 'pebble-quota [32]' scope-whitespace
+uv run /home/agent/my-knowledge/agents/steward/scripts/check-evidence.py record /home/agent/.local/state/kandev-pacer/t3/evidence/9095fd36029075a94cf4c6751d01646c27a1c4246964f038f33218d70001d64a.evidence.json 'pebble-quota [32]' document-links
+uv run /home/agent/my-knowledge/agents/steward/scripts/check-evidence.py record /home/agent/.local/state/kandev-pacer/t3/evidence/9095fd36029075a94cf4c6751d01646c27a1c4246964f038f33218d70001d64a.evidence.json 'pebble-quota [32]' evidence-consistency
+```
+
+<details>
+<summary>Exact acceptance check bodies</summary>
+
+- **scope-whitespace**
+
+```bash
+python3 - <<'PY'
+import subprocess
+base='61a035f991a37e7857664a0aa2275c36a354471e'; delivery='48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'
+paths=subprocess.check_output(['git','diff','--name-only',base,delivery],text=True).splitlines()
+assert set(paths)=={'docs/reviews/2026-10-28-reset-grant-retention.md','docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md'},paths
+subprocess.run(['git','diff','--check',base,delivery],check=True)
+for path in ['TASKS.md','docs/tasks/30-include-claude-reset-grants-in-quota-snapshots.md']:
+    assert subprocess.check_output(['git','show',base+':'+path])==subprocess.check_output(['git','show',delivery+':'+path])
+assert not subprocess.check_output(['git','diff','--name-only','75dec32cc7db0f9432b6ae999c4aaf32fbc2e778',delivery,'--','collector','tests','docs/collector.md'])
+print('PASS: documentation-only delivery, whitespace clean, original task and reviewed source unchanged')
+PY
+```
+
+- **document-links**
+
+```bash
+python3 - <<'PY'
+import posixpath,re,subprocess
+revision='48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'
+for path in ['docs/reviews/2026-10-28-reset-grant-retention.md','docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md']:
+    text=subprocess.check_output(['git','show',revision+':'+path],text=True)
+    prose=re.sub(r'```.*?```','',text,flags=re.S)
+    assert all(len(line.lstrip('# '))<=60 for line in prose.splitlines() if line.startswith('#'))
+    assert not re.search(r'\[[^\]]+\]\([^\)]+\)',prose)
+    definitions={re.sub(r'\s+',' ',label).lower():target for label,target in re.findall(r'^\[([^\]]+)\]:\s+(\S+)',text,re.M)}
+    body=re.sub(r'^\[[^\]]+\]:.*$','',prose,flags=re.M)
+    for label in re.findall(r'\[([^\]]+)\]',body):
+        assert re.sub(r'\s+',' ',label).lower() in definitions,label
+    for target in definitions.values():
+        if '://' not in target:
+            resolved=posixpath.normpath(posixpath.join(posixpath.dirname(path),target.split('#')[0]))
+            subprocess.run(['git','cat-file','-e',revision+':'+resolved],check=True)
+    assert 'Cause unresolved' in text
+print('PASS: pinned documents have resolving references, reference-style links, short headings and an unresolved conclusion')
+PY
+```
+
+- **evidence-consistency**
+
+```bash
+python3 - <<'PY'
+import hashlib,json,subprocess
+from pathlib import Path
+from datetime import datetime
+root=Path('/home/agent/tmp/hai32')
+a=json.loads((root/'inventory-summary.json').read_text())
+b=json.loads((root/'retention-summary.json').read_text())
+report=subprocess.check_output(['git','show','48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'+':'+'docs/reviews/2026-10-28-reset-grant-retention.md'],text=True)
+task=subprocess.check_output(['git','show','48920ee8e43edd73eeb0cc91b5ca458c9e0bb93c'+':'+'docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md'],text=True)
+for row in a['journals'].values():
+    assert row['exit']==0 and row['counts']=={'records':115,'attempt':107,'skip':8}
+    assert row['outcomes']=={'ok':99,'429':8} and row['skips']=={'retry_at':8}
+    assert row['first']=='2026-10-28T09:53:57.778418+00:00'
+    assert row['last']=='2026-10-28T19:26:14.544241+00:00'
+    assert row['max_gap_seconds']==602.437567
+    assert len(row['failures'])==8 and all(x['outcome']=='429' for x in row['failures'])
+assert '107 requests = 99 ok + 8 HTTP 429' in report and '8 retry_at skips' in report
+assert a['series'][0]['counts']=={'lines':285,'no_claude_error':112,'other_error':16}
+assert a['series'][1]['counts']=={'lines':250,'no_claude_error':87,'other_error':7}
+assert '128 samples' in report and '94' in report and '112 without a Claude error and 16' in report
+for name,record in a['saved'].items():
+    assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==record['sha256']
+    if 'observed' in record:
+        assert record['collector']['last_success_at']=='2026-10-26T17:11:52.541622+00:00'
+        assert record['grant_metadata'] and record['quota_available']
+        assert record['collector']['retry_at'] is None
+assert sum(j['readable'] for j in b['journals'])==2
+assert any(j['path'].endswith('/system.journal') and not j['readable'] for j in b['journals'])
+assert 'unknown' in report and 'worker summaries' in report and 'snapshot samples' in report
+packet=Path('/home/agent/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.evidence.json')
+old=next(i for i in json.loads(packet.read_text())['items'] if i['issue']=='pebble-quota [30]')
+for name in ['offline-suite','grant-regression','ruff','ty','whitespace','scope','revert-policy','journal-inventory']:
+    assert old['evidence'][name]['result']=='pass' and old['evidence'][name]['exit_code']==0
+assert old['evidence']['journal-coverage']['result']=='fail'
+assert old['verdict']=='needs a fix'
+for p in [root/'inventory-summary.json',root/'retention-summary.json',packet,Path('/tmp/kandev-quota-deploy.json'),Path('/tmp/kandev-quota-live-verification.json')]:
+    assert hashlib.sha256(p.read_bytes()).hexdigest() in task
+print('PASS: report aggregates and provenance agree with frozen summaries; original historical failure and hold remain explicit')
+PY
+```
+
+</details>
+
+### Recorder memory reports
+
+Each row names the recorder invocation above. There were no unavailable,
+failed, skipped or stopped integrity checks. The existing offline suite was
+not rerun; it was reused as documented. Inaccessible system journal history
+and the prior failed historical coverage check remain outcome limitations.
+
+| Recorder check | Outcome | Wait s | Admission / final MiB | Swap start / growth MiB | Elapsed s | Status |
+| --- | --- | ---: | --- | --- | ---: | --- |
+| `record scope-whitespace` | started at once | 0.0 | 56301 / 56298 | 262 / 0 | 0.25 | exit 0 |
+| `record document-links` | started at once | 0.0 | 56306 / 56299 | 262 / 0 | 0.25 | exit 0 |
+| `record evidence-consistency` | started at once | 0.0 | 55209 / 55076 | 262 / 0 | 0.25 | exit 0 |
+
+Investigation and recording finished at `2026-10-28T20:17:40.489880+00:00`, within the bounded pass.
+The completion move leaves acceptance unchecked. Owner next action: read the
+short retention review and settle this main thread if this bounded unresolved
+outcome is accepted. Acceptance completes this evidence investigation only;
+it does not accept the original reset-grant delivery or authorize operations.
+
+[integrity receipt]: 32-recover-retained-runtime-evidence-for-reset-grant-snapshots.evidence.json

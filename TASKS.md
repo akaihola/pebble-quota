@@ -21,10 +21,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [32] Recover retained runtime evidence for reset-grant snapshots
-      <!-- hai:{"id":"simple-c4c53ed6-204b-4631-9e72-547b47031a87","labels":["steward","review"],"createdAt":"2026-10-28T20:05:49.720Z","updatedAt":"2026-10-28T20:06:31.453Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [32] Recover retained runtime evidence for reset-grant snapshots
+      <!-- hai:{"id":"simple-c4c53ed6-204b-4631-9e72-547b47031a87","labels":["steward","review"],"createdAt":"2026-10-28T20:05:49.720Z","updatedAt":"2026-10-28T20:18:02.742Z"} -->
 
 - [x] [31] Log each Claude quota request's outcome so the rising 429 rate can be
   explained
