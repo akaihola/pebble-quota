@@ -57,3 +57,17 @@ links and repository-relative/Filemill links for paths; receipt paths are exempt
 [the causal-evidence checklist]: http://tinni/my-knowledge/agents/steward/notes/causal-evidence-checklist.md?f
 
 [the review directory]: ../reviews/
+
+
+## Investigation plan
+
+1. Inventory readable local journal files and exports, collector snapshot state,
+   quota time series, and saved implementation/recheck receipts. Restrict content
+   reads to relevant records and emit only timestamps, fixed categories and counts.
+2. Assess retained coverage around the October 26 restart through the October 28
+   verdict; apply the causal checklist and separate records from prior claims.
+3. Write one reproducible review, preserve the original hold, then merge the
+   documentation and record integrity checks before completing this issue.
+
+One bounded pass, at most 45 minutes. No live operations or new offline suite.
+Main thread: `c2f2f87a-4f49-4ae2-aeec-cdaaf9cbf2cb`; no related threads.
