@@ -236,10 +236,11 @@ A skipped pass writes `claude skip: ` with the same JSON fields and outcome
 `refresh_interval` or `retry_at`, at most once per refresh pass. Its `attempt_at`
 is the pass time; no HTTP request took place. Skips never enter request counts.
 
-Daily counts by request outcome for the previous calendar day (local timezone):
+Daily counts by request outcome for the previous calendar day (local timezone);
+for a system-unit install, drop `--user`:
 
 ```bash
-journalctl -u pebble-quota.service --since yesterday --until today -o cat | python3 -c 'import collections,json,sys; print(dict(collections.Counter(str(json.loads(line.removeprefix("claude attempt: "))["outcome"]) for line in sys.stdin if line.startswith("claude attempt: "))))'
+journalctl --user -u pebble-quota.service --since yesterday --until today -o cat | python3 -c 'import collections,json,sys; print(dict(collections.Counter(str(json.loads(line.removeprefix("claude attempt: "))["outcome"]) for line in sys.stdin if line.startswith("claude attempt: "))))'
 ```
 
 ### Codex diagnostics
