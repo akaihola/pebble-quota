@@ -213,6 +213,35 @@ Codex and temperature continue refreshing. Successful collection clears retry
 state; a different failure also replaces the 429 fields. Repeated `collect`
 commands and restarts share cooldown only when they use the same output file.
 
+### Claude request journal
+
+Each actual Claude usage request writes one stderr line with prefix
+`claude attempt: ` followed by JSON. Fields are `provider` (`claude`),
+`outcome` (`ok`, an integer HTTP error status, `parse_error` for unusable
+windows, or a fixed error category such as `TimeoutError`, `URLError` or
+`JSONDecodeError`), `attempt_at` (UTC request start), `last_success_at`
+(the previous service value), `retry_at` (the resulting cooldown deadline),
+and `retry_after`. Missing values are JSON `null`. Successful requests clear
+`retry_at`; a non-429 error also clears it. The snapshot and cooldown rules
+are unchanged. Scheduling state is written by the normal snapshot persistence;
+its existing failure diagnostic still applies if a disk write fails.
+
+`retry_after` contains only the response's Retry-After metadata: decimal seconds
+are normalized, HTTP dates become ISO timestamps, and malformed values become
+`invalid`. Other headers, credentials, URLs, bodies and provider fields never
+enter these lines. Credential/preflight failures before HTTP starts produce no
+request line. Parse failures after a response still count as requests.
+
+A skipped pass writes `claude skip: ` with the same JSON fields and outcome
+`refresh_interval` or `retry_at`, at most once per refresh pass. Its `attempt_at`
+is the pass time; no HTTP request took place. Skips never enter request counts.
+
+Daily counts by request outcome for the previous calendar day (local timezone):
+
+```bash
+journalctl -u pebble-quota.service --since yesterday --until today -o cat | python3 -c 'import collections,json,sys; print(dict(collections.Counter(str(json.loads(line.removeprefix("claude attempt: "))["outcome"]) for line in sys.stdin if line.startswith("claude attempt: "))))'
+```
+
 ### Codex diagnostics
 
 RPC failures use fixed diagnostics naming the stage (`initialize` or

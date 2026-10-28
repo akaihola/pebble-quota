@@ -414,6 +414,109 @@ class ClaudeBackoffTests(unittest.TestCase):
                          dict(self.codex.return_value, last_attempt_at=quota.iso_from_epoch(300),
                               last_success_at=quota.iso_from_epoch(300)))
 
+    def records(self, kind="attempt"):
+        prefix = f"claude {kind}: "
+        return [json.loads(line.removeprefix(prefix)) for line in self.logs.getvalue().splitlines()
+                if line.startswith(prefix)]
+
+    def test_success_and_recovery_log_previous_success(self):
+        self.logs = self.enterContext(contextlib.redirect_stderr(io.StringIO()))
+        self.refresh()
+        self.assertEqual(self.records(), [{
+            "provider": "claude", "outcome": "ok", "attempt_at": quota.iso_from_epoch(0),
+            "last_success_at": None, "retry_at": None, "retry_after": None}])
+        self.now = 300
+        self.refresh()
+        self.assertEqual(self.records()[-1]["last_success_at"], quota.iso_from_epoch(0))
+        self.assertEqual(self.records()[-1]["attempt_at"], quota.iso_from_epoch(300))
+
+    def test_http_outcomes_match_persisted_cooldown_and_hide_secrets(self):
+        self.logs = self.enterContext(contextlib.redirect_stderr(io.StringIO()))
+        for code, header in ((429, "1200"), (429, None), (503, None),
+                             (503, "Wed, 28 Oct 2026 12:00:00 GMT"),
+                             (429, "secret-header-value\nforged-log")):
+            with self.subTest(code=code, header=header):
+                self.output.unlink(missing_ok=True)
+                self.logs.seek(0)
+                self.logs.truncate()
+                headers = Message()
+                headers["Authorization"] = "secret-authorization"
+                if header is not None:
+                    headers["Retry-After"] = header
+                self.http.side_effect = urllib.error.HTTPError(
+                    "https://secret-url:secret-token@example.invalid", code, "secret-reason",
+                    headers, io.BytesIO(b"secret-response-body"))
+                saved = self.refresh()
+                record, = self.records()
+                self.assertEqual(record["outcome"], code)
+                self.assertEqual(record["retry_at"], saved.get("retry_at"))
+                expected = ("invalid" if header and header.startswith("secret") else
+                            "2026-10-28T12:00:00+00:00" if header and header.startswith("Wed")
+                            else header)
+                self.assertEqual(record["retry_after"], expected)
+                self.assertNotIn("secret", self.logs.getvalue())
+                self.assertEqual(len(self.logs.getvalue().splitlines()), 1)
+
+    def test_network_timeout_and_parse_errors(self):
+        self.logs = self.enterContext(contextlib.redirect_stderr(io.StringIO()))
+        for error, outcome in ((urllib.error.URLError("secret-connection"), "URLError"),
+                               (TimeoutError("secret-timeout"), "TimeoutError"),
+                               (json.JSONDecodeError("secret-body", "secret-body", 0),
+                                "JSONDecodeError")):
+            with self.subTest(outcome=outcome):
+                self.http.side_effect = error
+                self.refresh()
+                self.assertEqual(self.records()[-1]["outcome"], outcome)
+                self.assertNotIn("secret", self.logs.getvalue())
+
+    def test_skips_are_separate_once_per_pass(self):
+        self.logs = self.enterContext(contextlib.redirect_stderr(io.StringIO()))
+        self.http_error("1200")
+        self.refresh()
+        self.now = 100
+        self.http.reset_mock()
+        quota.collect_all(json.loads(self.output.read_text()), interval_seconds=300)
+        self.http.assert_not_called()
+        self.assertEqual(len(self.records()), 1)
+        self.assertEqual([r["outcome"] for r in self.records("skip")], ["refresh_interval"])
+        self.now = 300
+        self.refresh()
+        self.http.assert_not_called()
+        self.assertEqual(len(self.records()), 1)
+        self.assertEqual([r["outcome"] for r in self.records("skip")],
+                         ["refresh_interval", "retry_at"])
+
+    def test_success_response_retry_after_and_no_body_or_token(self):
+        self.logs = self.enterContext(contextlib.redirect_stderr(io.StringIO()))
+        class Response(_FakeResponse):
+            headers: ClassVar = {"Retry-After": "60", "Authorization": "secret-authorization"}
+
+        response = Response(dict(self.PAYLOAD, private="secret-response-body"))
+        self.http.side_effect = lambda *args, **kwargs: response
+        self.refresh()
+        record, = self.records()
+        self.assertEqual(record["retry_after"], "60")
+        self.assertNotIn("secret", self.logs.getvalue())
+        self.assertNotIn("Bearer test", self.logs.getvalue())
+
+    def test_failure_logs_previous_success_and_new_deadline(self):
+        self.logs = self.enterContext(contextlib.redirect_stderr(io.StringIO()))
+        self.refresh()
+        self.now = 300
+        self.http_error("60")
+        saved = self.refresh()
+        record = self.records()[-1]
+        self.assertEqual(record["last_success_at"], quota.iso_from_epoch(0))
+        self.assertEqual(record["retry_at"], saved["retry_at"])
+        self.assertEqual(record["retry_at"], quota.iso_from_epoch(360))
+
+    def test_preflight_failure_is_not_a_request(self):
+        self.logs = self.enterContext(contextlib.redirect_stderr(io.StringIO()))
+        with mock.patch.object(quota.Path, "read_text", side_effect=OSError("secret-path")):
+            quota.collect_all()
+        self.http.assert_not_called()
+        self.assertEqual(self.records(), [])
+
 
 @contextlib.contextmanager
 def loopback_server(snapshot: Path, token: str):

@@ -29,3 +29,44 @@ kandev-pacer [205]'s investigation (its task record, "Collector journal investig
 
 [k205]: http://tinni/prg/kandev-pacer/docs/tasks/205-keep-using-claude-s-last-good-pebble-reading-for-up-to-15-minutes-afte.md?f
 [p30]: 30-include-claude-reset-grants-in-quota-snapshots.md
+
+
+## Implementation plan
+
+- Capture request start and response Retry-After at the Claude HTTP boundary;
+  emit an allowlisted JSON journal record after cooldown calculation.
+- Emit separate refresh/cooldown skips, without changing snapshot fields,
+  retention or backoff behavior.
+- Add offline outcome and redaction coverage, document the format and daily
+  counts, then validate, merge and record checks at the delivery commit.
+
+## Delivery notes
+
+Implemented request and skip stderr records in the [collector], with offline
+coverage in the [test suite] and operator instructions in the [collector guide].
+No live provider requests, service restart or installed configuration changes.
+The steward can restart after merge and collect a day of outcome counts.
+
+[collector]: ../../collector/pebble_quota.py
+[test suite]: ../../tests/test_pebble_quota.py
+[collector guide]: ../collector.md
+
+## Review and preliminary validation
+
+Reviewed the diff: no snapshot fields, stale retention or cooldown calculations
+changed; existing tests were left intact. HTTP metadata is captured before
+JSON parsing, so malformed responses and HTTP errors are counted. Preflight
+failures do not impersonate HTTP requests. Retry-After dates/numbers are
+normalized before logging to avoid echoing arbitrary header text.
+
+The preliminary full offline suite passed (117 tests); Ruff, ty and whitespace
+checks also passed. Final merged-commit checks and receipt follow below.
+
+### Memory reports
+
+| Command | Outcome | Wait | Admission / final MiB | Initial swap / growth MiB | Elapsed | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `python3 -m unittest discover -s tests -v` | started at once | 0 s | 56061 / 55877 | 10 / 0 | 14.78 s | exit 0 |
+| `python3 -m unittest discover -s tests -v && ruff check . && ty check && git diff --check` | started at once | 0 s | 56082 / 56036 | 10 / 0 | 14.78 s | exit 0 |
+
+Final pre-merge validation passed: 118 offline tests, Ruff, ty and whitespace.

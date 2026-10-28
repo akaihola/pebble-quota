@@ -276,7 +276,7 @@ def provider_urlopen(request: urllib.request.Request, timeout: int):
     return urllib.request.build_opener(NoProviderRedirect()).open(request, timeout=timeout)
 
 
-def collect_claude() -> dict[str, Any]:
+def collect_claude(attempt: dict[str, Any] | None = None) -> dict[str, Any]:
     credentials = json.loads((Path.home() / ".claude/.credentials.json").read_text())
     token = credentials.get("claudeAiOauth", {}).get("accessToken")
     if not token:
@@ -289,7 +289,11 @@ def collect_claude() -> dict[str, Any]:
             "User-Agent": "pebble-quota/0.1",
         },
     )
+    if attempt is not None:
+        attempt["attempt_at"] = utc_iso()
     with provider_urlopen(request, timeout=15) as response:
+        if attempt is not None:
+            attempt["retry_after"] = getattr(response, "headers", {}).get("Retry-After")
         raw = json.load(response)
     if not isinstance(raw, dict):
         return {"service": "claude", "windows": {}}
@@ -504,6 +508,29 @@ def claude_retry_delay(retry_after: str | None, failures: int, now: int) -> floa
                CLAUDE_BACKOFF_SECONDS * 2 ** min(failures - 1, 3))
 
 
+def log_claude_attempt(kind: str, attempt: dict[str, Any], previous: dict[str, Any],
+                       service: dict[str, Any]) -> None:
+    """Emit only scheduling fields and bounded, validated Retry-After metadata."""
+    retry_after = attempt.get("retry_after")
+    if retry_after is not None:
+        try:
+            # Never echo arbitrary header text, even if the server sent it here.
+            value = retry_after.strip()
+            if len(value) > 64:
+                retry_after = "invalid"
+            elif value.isascii() and value.isdigit():
+                retry_after = str(int(value))
+            else:
+                retry_after = parsedate_to_datetime(value).isoformat()
+        except (ValueError, TypeError, OverflowError):
+            retry_after = "invalid"
+    record = {"provider": "claude", "attempt_at": attempt["attempt_at"],
+              "outcome": attempt["outcome"], "last_success_at": previous.get("last_success_at"),
+              "retry_at": service.get("retry_at"), "retry_after": retry_after}
+    print(f"claude {kind}: {json.dumps(record, separators=(',', ':'))}",
+          file=sys.stderr, flush=True)
+
+
 def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 0,
                 before_attempt: Callable[[str, str], None] | None = None) -> dict[str, Any]:
     output: dict[str, Any] = {"collected_at": utc_iso(), "services": {}}
@@ -519,20 +546,32 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
         last_attempt = epoch(old_service.get("last_attempt_at"))
         if last_attempt is not None and now < last_attempt + interval_seconds:
             output["services"][name] = dict(old_service)
+            if name == "claude":
+                log_claude_attempt("skip", {"attempt_at": output["collected_at"],
+                                           "outcome": "refresh_interval"}, old_service, old_service)
             continue
         if name == "claude" and (epoch(old_claude.get("retry_at")) or 0) > now:
             output["services"][name] = dict(old_claude)
+            log_claude_attempt("skip", {"attempt_at": output["collected_at"],
+                                       "outcome": "retry_at"}, old_claude, old_claude)
             continue
         if before_attempt is not None:
             before_attempt(name, output["collected_at"])
+        attempt: dict[str, Any] = {}
         try:
+            collected = collect_claude(attempt) if name == "claude" else collector()
             output["services"][name] = normalize_snapshot(
-                {"services": {name: collector()}})["services"].get(name, {})
+                {"services": {name: collected}})["services"].get(name, {})
             if not output["services"][name].get("windows"):
                 output["services"][name].setdefault("error", "Invalid quota windows")
             if output["services"][name].get("windows"):
                 output["services"][name]["last_success_at"] = output["collected_at"]
+            attempt["outcome"] = ("parse_error" if "error" in output["services"][name] else "ok")
         except Exception as exc:  # noqa: BLE001 - isolate providers; record, then collect the next
+            attempt["outcome"] = diagnostic(exc)
+            if isinstance(exc, urllib.error.HTTPError):
+                attempt["outcome"] = exc.code
+                attempt["retry_after"] = exc.headers.get("Retry-After") if exc.headers else None
             service = {"service": name, "error": diagnostic(exc)}
             output["services"][name] = service
             if name == "claude" and isinstance(exc, urllib.error.HTTPError) and exc.code == 429:
@@ -545,6 +584,8 @@ def collect_all(previous: dict[str, Any] | None = None, interval_seconds: int = 
             if isinstance(exc, urllib.error.HTTPError):
                 exc.close()
         output["services"][name]["last_attempt_at"] = output["collected_at"]
+        if name == "claude" and "attempt_at" in attempt:
+            log_claude_attempt("attempt", attempt, old_claude, output["services"][name])
     claude = output["services"]["claude"]
     if "error" in claude and old_claude.get("windows"):
         last_success = old_claude.get("last_success_at", previous.get("collected_at"))
