@@ -17,11 +17,11 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+## Scheduled
+
 - [31] Log each Claude quota request's outcome so the rising 429 rate can be
   explained
-  <!-- hai:{"id":"simple-d2846a48-0c64-4bde-8739-570cb863adbf","labels":["steward"],"createdAt":"2026-10-28T08:33:06.507Z","updatedAt":"2026-10-28T08:33:06.507Z"} -->
-
-## Scheduled
+  <!-- hai:{"id":"simple-d2846a48-0c64-4bde-8739-570cb863adbf","labels":["steward"],"createdAt":"2026-10-28T08:33:06.507Z","updatedAt":"2026-10-28T08:33:25.351Z"} -->
 
 ## In Progress
 
