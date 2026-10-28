@@ -70,3 +70,39 @@ checks also passed. Final merged-commit checks and receipt follow below.
 | `python3 -m unittest discover -s tests -v && ruff check . && ty check && git diff --check` | started at once | 0 s | 56082 / 56036 | 10 / 0 | 14.78 s | exit 0 |
 
 Final pre-merge validation passed: 118 offline tests, Ruff, ty and whitespace.
+
+## Merged delivery and check receipt
+
+Base: `668db6899650d257450b6bac97d0af69ef11ac14`. Delivery commit (oldest first):
+`220aeaa3eee5ae1593acefb6357d4961c9bebefb`. Fast-forwarded onto `main`; branch and
+worktree retained. Acceptance remains unchecked for the steward.
+
+All five checks passed at the delivery commit in a clean detached task
+worktree. The [check receipt] contains exact commands, repository identity and
+results. No lockfile or editable local dependencies exist in this stdlib-only
+project, so dependency declarations are empty.
+
+- **claude-outcomes:** `PYTHONPATH=tests python3 -m unittest -v test_pebble_quota.ClaudeBackoffTests` — exit 0 (14 tests, including seven new logging tests).
+- **offline-suite:** `python3 -m unittest discover -s tests -v` — exit 0 (118 tests).
+- **ruff:** `ruff check .` — exit 0.
+- **ty:** `ty check` — exit 0.
+- **whitespace:** `git diff --check 668db6899650d257450b6bac97d0af69ef11ac14 220aeaa3eee5ae1593acefb6357d4961c9bebefb` — exit 0.
+
+### Recording memory reports
+
+Each row names one invocation of the evidence recorder (`uv run` with its
+`record` subcommand, this issue and the check ID); the declaration and logs
+stayed outside the clean checkout. Commands and paths are in the receipt.
+
+| Recorder check | Outcome | Wait | Admission / final MiB | Initial swap / growth MiB | Elapsed | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `record claude-outcomes` | started at once | 0.0 s | 56023 / 55993 | 10 / 0 | 0.25 s | exit 0 |
+| `record offline-suite` | started at once | 0.0 s | 56063 / 56015 | 10 / 0 | 14.78 s | exit 0 |
+| `record ruff` | started at once | 0.0 s | 56039 / 56037 | 10 / 0 | 0.25 s | exit 0 |
+| `record ty` | started at once | 0.0 s | 56030 / 56049 | 10 / 0 | 0.25 s | exit 0 |
+| `record whitespace` | started at once | 0.0 s | 56049 / 56047 | 10 / 0 | 0.25 s | exit 0 |
+
+The steward owns the planned collector restart and next-day count review;
+there is no owner decision or agent-owned implementation gap.
+
+[check receipt]: 31-log-each-claude-quota-request-s-outcome-so-the-rising-429-rate-can-be-.evidence.json
