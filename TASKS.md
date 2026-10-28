@@ -225,6 +225,11 @@ Here are the rules for TASKS.md usage:
 
 ### Workflow for new issue completion
 
+`## Ordered backlog` and `## Scheduled` are the pacer's launch queue.
+An agent or person doing the work itself must create or move the issue straight
+to `## In Progress` on `main`, commit that change, then create the worktree branch
+from there. `## Scheduled` is only for issues the heartbeat hands to the pacer.
+
 - Pick the first backlog issue with no dependency to any uncompleted issue.
 - Move it to `In progress` in `main` branch.
 - Create or update, review and refine a plan in
