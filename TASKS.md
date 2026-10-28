@@ -17,6 +17,9 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [32] Recover retained runtime evidence for reset-grant snapshots
+  <!-- hai:{"id":"simple-c4c53ed6-204b-4631-9e72-547b47031a87","labels":["steward","review"],"createdAt":"2026-10-28T20:05:49.720Z","updatedAt":"2026-10-28T20:05:49.720Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -130,7 +133,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -189,6 +192,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [30]: docs/tasks/30-include-claude-reset-grants-in-quota-snapshots.md
 
 [31]: docs/tasks/31-log-each-claude-quota-request-s-outcome-so-the-rising-429-rate-can-be-.md
+
+[32]: docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md
 
 ## Rules
 
