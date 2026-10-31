@@ -23,8 +23,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Completed / Accepted
 
-- [ ] [32] Recover retained runtime evidence for reset-grant snapshots
-      <!-- hai:{"id":"simple-c4c53ed6-204b-4631-9e72-547b47031a87","labels":["steward","review"],"createdAt":"2026-10-28T20:05:49.720Z","updatedAt":"2026-10-28T20:18:02.742Z"} -->
+- [x] [32] Recover retained runtime evidence for reset-grant snapshots
+      <!-- hai:{"id":"simple-c4c53ed6-204b-4631-9e72-547b47031a87","labels":["steward","review"],"createdAt":"2026-10-28T20:05:49.720Z","updatedAt":"2026-10-31T21:29:05.783Z"} -->
 
 - [x] [31] Log each Claude quota request's outcome so the rising 429 rate can be
   explained
@@ -35,7 +35,7 @@ Rules for TASKS.md usage are at the bottom of the file.
       <!-- hai:{"id":"simple-fb1302d2-2afc-4abf-a98e-9a70e02deaa7","createdAt":"2026-10-23T19:04:15.185Z","updatedAt":"2026-10-27T06:31:21.159Z"} -->
 
 - [ ] [30] Include Claude reset grants in quota snapshots
-      <!-- hai:{"id":"simple-d0e422c9-7c3f-4d9a-b566-b0117c922964","createdAt":"2026-10-26T16:49:22.746Z","updatedAt":"2026-10-26T17:13:14.698Z"} -->
+      <!-- hai:{"id":"simple-d0e422c9-7c3f-4d9a-b566-b0117c922964","createdAt":"2026-10-26T16:49:22.746Z","updatedAt":"2026-10-31T21:29:10.151Z"} -->
 
 - [x] [29] Check pebble-quota's documents against the ten source changes since the
   10-22 docs review

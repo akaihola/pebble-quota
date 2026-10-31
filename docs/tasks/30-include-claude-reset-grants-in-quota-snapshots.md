@@ -21,6 +21,24 @@ persisted retry deadlines remain in force.
   Claude quota and grants and clearing retry/stale state. The installed pacer
   read them without another HTTP request. Both services are active.
 
-Completion awaits user acceptance.
+## Evidence follow-up
 
-[kandev-pacer]: http://hopeli/prg/kandev-pacer/?f
+Antti accepted [the retained-evidence investigation] on 2026-10-31. That work
+recovered a saved success summary and reproduced the October 28 request
+counts, but did not recover continuous history or establish why rate limiting
+occurred. This delivery remains unaccepted; no defect or cause is established.
+
+- **Owner:** steward.
+- **Next action:** prepare a decision proposal for Antti that explains whether
+  the existing evidence can satisfy the acceptance policy. If it cannot,
+  specify the smallest additional evidence needed, how it could be obtained,
+  and any permissions required. Do not repeat the expired-history check or
+  start live requests, restarts, deployments or retention changes under this
+  task's existing authorization.
+
+No automatic experiment or service change follows acceptance of the
+investigation. Antti's acceptance of this delivery remains separate.
+
+[the retained-evidence investigation]: 32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md
+
+[kandev-pacer]: http://tinni/prg/kandev-pacer/?f

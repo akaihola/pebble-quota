@@ -53,8 +53,8 @@ links and repository-relative/Filemill links for paths; receipt paths are exempt
 
 [the task tracker]: ../../TASKS.md
 [the reset-grant delivery]: 30-include-claude-reset-grants-in-quota-snapshots.md
-[the independent recheck]: http://hopeli/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.md?f#collector-journal-and-attribution
-[the causal-evidence checklist]: http://hopeli/my-knowledge/agents/steward/notes/causal-evidence-checklist.md?f
+[the independent recheck]: http://tinni/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.md?f#collector-journal-and-attribution
+[the causal-evidence checklist]: http://tinni/my-knowledge/agents/steward/notes/causal-evidence-checklist.md?f
 
 [the review directory]: ../reviews/
 
@@ -83,8 +83,8 @@ is unavailable. No owner operational action is needed.
 
 One bounded pass began at 2026-10-28 20:06 UTC. No source code, tests, service,
 configuration or provider traffic changed. No messages or related threads were
-created. Main thread remains unsettled for user acceptance. Settling it accepts
-only this investigation; there are no supporting threads to settle.
+created. Antti accepted this investigation on 2026-10-31. This main thread can
+be settled; there are no supporting threads to settle.
 
 ## Reproducing the inventory
 
@@ -336,9 +336,9 @@ Any wider search, privileged access, live experiment or retention proposal is
 future scoped work, not performed or requested from the owner here.
 
 [the retention review]: ../reviews/2026-10-28-reset-grant-retention.md
-[the sanitized outcome inventory]: http://hopeli/tmp/hai32/inventory-summary.json?f
-[the retention inventory]: http://hopeli/tmp/hai32/retention-summary.json?f
-[the independent receipt]: http://hopeli/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.evidence.json?f
+[the sanitized outcome inventory]: http://tinni/tmp/hai32/inventory-summary.json?f
+[the retention inventory]: http://tinni/tmp/hai32/retention-summary.json?f
+[the independent receipt]: http://tinni/my-knowledge/agents/steward/log/2026-10-28-quiet-repo-rechecks.evidence.json?f
 
 
 ## Merged delivery and integrity receipt
@@ -480,9 +480,11 @@ and the prior failed historical coverage check remain outcome limitations.
 | `record evidence-consistency` | started at once | 0.0 | 55209 / 55076 | 262 / 0 | 0.25 | exit 0 |
 
 Investigation and recording finished at `2026-10-28T20:17:40.489880+00:00`, within the bounded pass.
-The completion move leaves acceptance unchecked. Owner next action: read the
-short retention review and settle this main thread if this bounded unresolved
-outcome is accepted. Acceptance completes this evidence investigation only;
-it does not accept the original reset-grant delivery or authorize operations.
+Antti explicitly accepted this investigation on 2026-10-31. Its task is now
+accepted, and no operational action remains in this investigation. This main
+thread can be settled. Acceptance covers the bounded evidence investigation;
+it does not accept [the reset-grant delivery] or authorize live operations.
+The steward's next action is recorded in that delivery's task: prepare a
+concrete proposal for resolving its historical-evidence requirement.
 
 [integrity receipt]: 32-recover-retained-runtime-evidence-for-reset-grant-snapshots.evidence.json
