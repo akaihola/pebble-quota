@@ -1,5 +1,7 @@
 # Pebble Quota
 
+> This is a prototype developed using AI coding agents and not intended for production use.
+
 A Pebble Time 2 watch face showing Claude Code and Codex quota consumption
 against a sustainable, constant-use pace.
 
