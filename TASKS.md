@@ -14,10 +14,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [7] Gate releases on collector and phone behavior checks
-  <!-- hai:{"id":"simple-0973cf3d-1685-468a-b2fe-aa6a52710543","labels":["steward"],"createdAt":"2026-10-19T12:35:35.717Z","updatedAt":"2026-11-13T15:56:51.810Z"} -->
-
 ## Scheduled
+
+- [7] Gate releases on collector and phone behavior checks
+  <!-- hai:{"id":"simple-0973cf3d-1685-468a-b2fe-aa6a52710543","labels":["steward"],"createdAt":"2026-10-19T12:35:35.717Z","updatedAt":"2026-11-13T15:56:55.122Z"} -->
 
 ## In Progress
 
