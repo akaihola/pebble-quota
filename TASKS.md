@@ -18,10 +18,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [7] Gate releases on collector and phone behavior checks
-      <!-- hai:{"id":"simple-0973cf3d-1685-468a-b2fe-aa6a52710543","labels":["steward"],"createdAt":"2026-10-19T12:35:35.717Z","updatedAt":"2026-11-13T15:57:01.938Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [7] Gate releases on collector and phone behavior checks
+      <!-- hai:{"id":"simple-0973cf3d-1685-468a-b2fe-aa6a52710543","labels":["steward"],"createdAt":"2026-10-19T12:35:35.717Z","updatedAt":"2026-11-13T16:02:18.463Z"} -->
 
 - [ ] [33] Install the Pebble SDK automatically when a watchface build needs it
       <!-- hai:{"id":"simple-d1eb6ffb-8b84-4315-ae0f-fe2fd87f2d25","createdAt":"2026-11-13T15:31:28.725Z","updatedAt":"2026-11-13T15:38:02.394Z"} -->

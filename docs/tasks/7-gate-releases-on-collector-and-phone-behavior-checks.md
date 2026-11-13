@@ -108,3 +108,25 @@ All started at once; MemAvailable stayed about 43-45 GiB, swap free 11.2 GiB of
 | Demonstration suite with injected failure | about 45 GB | 15 s | exit 1 (expected) |
 
 No related child or forked threads were started.
+
+### Checks recorded at the merged commit
+
+Recorded by the delivering agent at 409ab31 (base 0d1ba4a; delivery commits
+8ac3eed, 409ab31) into the [receipt](7-gate-releases-on-collector-and-phone-behavior-checks.evidence.json?f),
+all `pass` with exit 0:
+
+- `suite-python311`: full suite on Nix Python 3.11 with watch tools required.
+- `release-jobs-need-test`: `release-please` and `publish` need `test`, and
+  their `if` has no status override; the `test` job runs unittest with
+  `PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS=1`.
+- `pbw-checks-preserved`: archive, UUID, `emery` and version checks remain.
+- `failing-assertion-fails-suite`: an exported copy with the 1% case changed
+  to the old 100% misreading fails the percentage tests (3 failures).
+- `workflow-actionlint`: no findings.
+
+Recording memory report: started at once (no wait); MemAvailable 45.2 GB at
+admission and 44.9 GB at the end; swap free 11.7 GB at start, no growth;
+19 s for all five record calls; exit 0 each.
+
+Thread identity: main thread baf7fca8-5a03-4e67-adc6-30f390790269, run
+ordinal 1. No related threads.

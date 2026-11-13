@@ -1,0 +1,107 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [7]",
+      "hai_id": "simple-0973cf3d-1685-468a-b2fe-aa6a52710543",
+      "title": "Gate releases on collector and phone behavior checks",
+      "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-7-gate-releases-on-collector-and-phone-behavior-checks-baf7fca8",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "0d1ba4a5df82e0e19d06aa48613cbbd7b981e074",
+      "delivery_commits": [
+        "8ac3eed8323f0c8b9275b714378079bf169c841c",
+        "409ab31dcc23c70eec2863a1b9d2ea2d156760f1"
+      ],
+      "handoff": {
+        "thread_id": "baf7fca8-5a03-4e67-adc6-30f390790269",
+        "run_id": "run:thread:baf7fca8-5a03-4e67-adc6-30f390790269:ordinal:1",
+        "disposition": "complete",
+        "outcome": "CI test job (Python 3.11, Node 24, watch tools required) now gates release-please and publish; percentage matrix 0/0.5/1/2/100/missing covers Codex fake app-server and both Claude payloads; build-environment test repaired after issue 33. Not yet run on a GitHub runner: the branch was not pushed.",
+        "next_actor": "Antti Kaihola (acceptance review; first GitHub run after the next push to main)"
+      },
+      "checks": [
+        {
+          "id": "suite-python311",
+          "command": "nix-shell -p python311 --run 'python3 --version && PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS=1 python3 -m unittest discover -s tests'",
+          "dependencies": {}
+        },
+        {
+          "id": "release-jobs-need-test",
+          "command": "uv run --no-project --with pyyaml python -c \"import yaml; j=yaml.safe_load(open('.github/workflows/build.yml'))['jobs']; assert set(j['release-please']['needs'])=={'test','build'}, j['release-please']['needs']; assert set(j['publish']['needs'])=={'test','build','release-please'}; assert not any(f in str(j[n].get('if','')) for n in ('release-please','publish') for f in ('always()','failure()','cancelled()')); assert 'unittest discover' in str(j['test']['steps']) and j['test']['env']['PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS']=='1'\"",
+          "dependencies": {}
+        },
+        {
+          "id": "pbw-checks-preserved",
+          "command": "grep -q 'unzip -t build/watchface.pbw' .github/workflows/build.yml && grep -q '.uuid == \"55cd5be7-0481-48aa-a20e-2edf1d8b713b\"' .github/workflows/build.yml && grep -q '.targetPlatforms == \\[\"emery\"\\]' .github/workflows/build.yml && grep -q '.versionLabel == \\$version' .github/workflows/build.yml",
+          "dependencies": {}
+        },
+        {
+          "id": "failing-assertion-fails-suite",
+          "command": "tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\"' EXIT && git archive 409ab31dcc23c70eec2863a1b9d2ea2d156760f1 | tar -x -C \"$tmp\" && sed -i 's/(1, .01, 1, 49)/(1, 1.0, 1, 49)/' \"$tmp/tests/test_pebble_quota.py\" && grep -q '(1, 1.0, 1, 49)' \"$tmp/tests/test_pebble_quota.py\" && ! (cd \"$tmp\" && python3 -m unittest tests.test_pebble_quota.ClaudeCollectTests tests.test_pebble_quota.CodexRPCTests)",
+          "dependencies": {}
+        },
+        {
+          "id": "workflow-actionlint",
+          "command": "nix-shell -p actionlint --run 'actionlint .github/workflows/build.yml'",
+          "dependencies": {}
+        }
+      ],
+      "evidence": {
+        "suite-python311": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-7-gate-releases-on-collector-and-phone-behavior-checks-baf7fca8",
+          "tested_commit": "409ab31dcc23c70eec2863a1b9d2ea2d156760f1",
+          "dependencies": {},
+          "issue": "pebble-quota [7]",
+          "check": "suite-python311",
+          "command": "nix-shell -p python311 --run 'python3 --version && PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS=1 python3 -m unittest discover -s tests'",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-11-13T16:02:00.052534+00:00"
+        },
+        "release-jobs-need-test": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-7-gate-releases-on-collector-and-phone-behavior-checks-baf7fca8",
+          "tested_commit": "409ab31dcc23c70eec2863a1b9d2ea2d156760f1",
+          "dependencies": {},
+          "issue": "pebble-quota [7]",
+          "check": "release-jobs-need-test",
+          "command": "uv run --no-project --with pyyaml python -c \"import yaml; j=yaml.safe_load(open('.github/workflows/build.yml'))['jobs']; assert set(j['release-please']['needs'])=={'test','build'}, j['release-please']['needs']; assert set(j['publish']['needs'])=={'test','build','release-please'}; assert not any(f in str(j[n].get('if','')) for n in ('release-please','publish') for f in ('always()','failure()','cancelled()')); assert 'unittest discover' in str(j['test']['steps']) and j['test']['env']['PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS']=='1'\"",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-11-13T16:02:00.194483+00:00"
+        },
+        "pbw-checks-preserved": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-7-gate-releases-on-collector-and-phone-behavior-checks-baf7fca8",
+          "tested_commit": "409ab31dcc23c70eec2863a1b9d2ea2d156760f1",
+          "dependencies": {},
+          "issue": "pebble-quota [7]",
+          "check": "pbw-checks-preserved",
+          "command": "grep -q 'unzip -t build/watchface.pbw' .github/workflows/build.yml && grep -q '.uuid == \"55cd5be7-0481-48aa-a20e-2edf1d8b713b\"' .github/workflows/build.yml && grep -q '.targetPlatforms == \\[\"emery\"\\]' .github/workflows/build.yml && grep -q '.versionLabel == \\$version' .github/workflows/build.yml",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-11-13T16:02:00.293028+00:00"
+        },
+        "failing-assertion-fails-suite": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-7-gate-releases-on-collector-and-phone-behavior-checks-baf7fca8",
+          "tested_commit": "409ab31dcc23c70eec2863a1b9d2ea2d156760f1",
+          "dependencies": {},
+          "issue": "pebble-quota [7]",
+          "check": "failing-assertion-fails-suite",
+          "command": "tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\"' EXIT && git archive 409ab31dcc23c70eec2863a1b9d2ea2d156760f1 | tar -x -C \"$tmp\" && sed -i 's/(1, .01, 1, 49)/(1, 1.0, 1, 49)/' \"$tmp/tests/test_pebble_quota.py\" && grep -q '(1, 1.0, 1, 49)' \"$tmp/tests/test_pebble_quota.py\" && ! (cd \"$tmp\" && python3 -m unittest tests.test_pebble_quota.ClaudeCollectTests tests.test_pebble_quota.CodexRPCTests)",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-11-13T16:02:03.821238+00:00"
+        },
+        "workflow-actionlint": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-7-gate-releases-on-collector-and-phone-behavior-checks-baf7fca8",
+          "tested_commit": "409ab31dcc23c70eec2863a1b9d2ea2d156760f1",
+          "dependencies": {},
+          "issue": "pebble-quota [7]",
+          "check": "workflow-actionlint",
+          "command": "nix-shell -p actionlint --run 'actionlint .github/workflows/build.yml'",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-11-13T16:02:04.639094+00:00"
+        }
+      }
+    }
+  ]
+}
