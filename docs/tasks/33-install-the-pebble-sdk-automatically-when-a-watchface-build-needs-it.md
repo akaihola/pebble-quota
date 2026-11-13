@@ -68,3 +68,23 @@ it is avoided by `npm_config_userconfig=/dev/null`, not detected.
 </details>
 
 [the watchface build recipe]: ../../watchface/Makefile?f
+
+## Checks recorded at the merged commit
+
+Recorded with the steward's `check-evidence.py record` in the task worktree at
+`a84b8b1`, results in the [receipt]: `missing-sdk-install-build` passed (exit 0,
+27 s) and `failed-install-preserves-bundle` passed (exit 0, 1 s). Both started at
+once with no wait: MemAvailable 44,137,804 kB at admission and 44,257,360 kB
+after; swap use was not sampled for these two short runs.
+
+Delivering thread: `0cbbae8d-2040-4724-8fee-f83c0ec2e2fa`, run 2. No child or
+related threads were started.
+
+Agent-owned gap: delivery commit `a84b8b1` also added `.serena/.gitignore` and
+`.serena/project.yml`, configuration files the Serena code-navigation tool wrote
+into the worktree, which are unrelated to this task. They were not removed
+because any further commit before the completion move would make the receipt
+stale. A later maintenance commit should delete them and add `.serena/` to the
+ignore rules.
+
+[receipt]: 33-install-the-pebble-sdk-automatically-when-a-watchface-build-needs-it.evidence.json?f

@@ -21,10 +21,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## In Progress
 
-- [~] [33] Install the Pebble SDK automatically when a watchface build needs it
-      <!-- hai:{"id":"simple-d1eb6ffb-8b84-4315-ae0f-fe2fd87f2d25","createdAt":"2026-11-13T15:31:28.725Z","updatedAt":"2026-11-13T15:33:11.522Z"} -->
-
 ## Completed / Accepted
+
+- [ ] [33] Install the Pebble SDK automatically when a watchface build needs it
+      <!-- hai:{"id":"simple-d1eb6ffb-8b84-4315-ae0f-fe2fd87f2d25","createdAt":"2026-11-13T15:31:28.725Z","updatedAt":"2026-11-13T15:38:02.394Z"} -->
 
 - [x] [32] Recover retained runtime evidence for reset-grant snapshots
       <!-- hai:{"id":"simple-c4c53ed6-204b-4631-9e72-547b47031a87","labels":["steward","review"],"createdAt":"2026-10-28T20:05:49.720Z","updatedAt":"2026-10-31T21:29:05.783Z"} -->

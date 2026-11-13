@@ -1,0 +1,58 @@
+{
+  "items": [
+    {
+      "issue": "pebble-quota [33]",
+      "hai_id": "simple-d1eb6ffb-8b84-4315-ae0f-fe2fd87f2d25",
+      "title": "Install the Pebble SDK automatically when a watchface build needs it",
+      "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-33-install-the-pebble-sdk-automatically-when-a-watchface-build-need-0cbbae8d",
+      "source_repository": "/home/agent/prg/pebble-quota",
+      "base_commit": "345f62001e48edffbb0800b0055ec05514fc973f",
+      "delivery_commits": [
+        "a84b8b126802adce79a517a431667f1af084e5f1"
+      ],
+      "handoff": {
+        "thread_id": "0cbbae8d-2040-4724-8fee-f83c0ec2e2fa",
+        "run_id": "run:thread:0cbbae8d-2040-4724-8fee-f83c0ec2e2fa:ordinal:2",
+        "disposition": "complete",
+        "outcome": "make build/clean install Pebble SDK 4.33.1 when none is active and stop visibly before cleaning if installation fails; SDK removed from agent@tinni (816,443,392 bytes freed). The delivery commit also added unrelated .serena/ config files by mistake.",
+        "next_actor": "Antti Kaihola (acceptance review)"
+      },
+      "checks": [
+        {
+          "id": "missing-sdk-install-build",
+          "command": "tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\"' EXIT && make -C watchface HOME=\"$tmp\" clean build && unzip -p watchface/build/watchface.pbw appinfo.json | grep -q 55cd5be7-0481-48aa-a20e-2edf1d8b713b && rm -rf watchface/build",
+          "dependencies": {}
+        },
+        {
+          "id": "failed-install-preserves-bundle",
+          "command": "tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\" watchface/build' EXIT && mkdir -p watchface/build && echo old > watchface/build/watchface.pbw && ! make -C watchface HOME=\"$tmp\" PEBBLE_SDK_VERSION=0.0.0 clean build && grep -qx old watchface/build/watchface.pbw && ! test -e \"$tmp/.local/share/pebble-sdk/SDKs/current\"",
+          "dependencies": {}
+        }
+      ],
+      "evidence": {
+        "missing-sdk-install-build": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-33-install-the-pebble-sdk-automatically-when-a-watchface-build-need-0cbbae8d",
+          "tested_commit": "a84b8b126802adce79a517a431667f1af084e5f1",
+          "dependencies": {},
+          "issue": "pebble-quota [33]",
+          "check": "missing-sdk-install-build",
+          "command": "tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\"' EXIT && make -C watchface HOME=\"$tmp\" clean build && unzip -p watchface/build/watchface.pbw appinfo.json | grep -q 55cd5be7-0481-48aa-a20e-2edf1d8b713b && rm -rf watchface/build",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-11-13T15:37:46.634689+00:00"
+        },
+        "failed-install-preserves-bundle": {
+          "repository": "/home/agent/.t3/worktrees/pebble-quota/pacer-33-install-the-pebble-sdk-automatically-when-a-watchface-build-need-0cbbae8d",
+          "tested_commit": "a84b8b126802adce79a517a431667f1af084e5f1",
+          "dependencies": {},
+          "issue": "pebble-quota [33]",
+          "check": "failed-install-preserves-bundle",
+          "command": "tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\" watchface/build' EXIT && mkdir -p watchface/build && echo old > watchface/build/watchface.pbw && ! make -C watchface HOME=\"$tmp\" PEBBLE_SDK_VERSION=0.0.0 clean build && grep -qx old watchface/build/watchface.pbw && ! test -e \"$tmp/.local/share/pebble-sdk/SDKs/current\"",
+          "result": "pass",
+          "exit_code": 0,
+          "timestamp": "2026-11-13T15:37:47.216383+00:00"
+        }
+      }
+    }
+  ]
+}
