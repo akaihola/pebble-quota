@@ -17,6 +17,9 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
+- [33] Install the Pebble SDK automatically when a watchface build needs it
+  <!-- hai:{"id":"simple-d1eb6ffb-8b84-4315-ae0f-fe2fd87f2d25","createdAt":"2026-11-13T15:31:28.725Z","updatedAt":"2026-11-13T15:31:28.725Z"} -->
+
 ## Scheduled
 
 ## In Progress
@@ -133,7 +136,7 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 [2]: docs/tasks/2-back-off-on-http-429-from-claude-s-usage-endpoint-and-keep-the-last-re.md
 
-<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32 -->
+<!-- hai:reserved-numbers:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33 -->
 
 [3]: docs/tasks/3-fix-claude-1-showing-as-100.md
 
@@ -194,6 +197,8 @@ Rules for TASKS.md usage are at the bottom of the file.
 [31]: docs/tasks/31-log-each-claude-quota-request-s-outcome-so-the-rising-429-rate-can-be-.md
 
 [32]: docs/tasks/32-recover-retained-runtime-evidence-for-reset-grant-snapshots.md
+
+[33]: docs/tasks/33-install-the-pebble-sdk-automatically-when-a-watchface-build-needs-it.md
 
 ## Rules
 
