@@ -10,6 +10,28 @@ permissions:
   contents: read
 
 jobs:
+  # Collector and phone behaviour checks. Release jobs need this job to pass.
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # The oldest Python the README supports for the suite.
+      TEST_PYTHON_VERSION: '3.11'
+      TEST_NODE_VERSION: '24'
+      PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.TEST_NODE_VERSION }}
+
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.TEST_PYTHON_VERSION }}
+
+      - name: Run unit tests
+        run: uv run --no-project --python "$TEST_PYTHON_VERSION" python -m unittest discover -s tests -v
+
   build:
     runs-on: ubuntu-latest
     env:
@@ -72,7 +94,7 @@ jobs:
 
   release-please:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build
+    needs: [test, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -90,7 +112,7 @@ jobs:
 
   publish:
     if: needs.release-please.outputs.release_created == 'true'
-    needs: [build, release-please]
+    needs: [test, build, release-please]
     runs-on: ubuntu-latest
     permissions:
       contents: write

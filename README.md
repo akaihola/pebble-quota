@@ -41,14 +41,18 @@ ty check
 The suite uses synthetic provider responses, fake subprocesses and loopback HTTP
 servers; it blocks real provider access. Its watch pipeline tests run the phone
 script under Node and compile the watch's message and gauge rules with the host C compiler;
-they are skipped when `node` or `cc` is missing. No project configuration is
+they are skipped when `node` or `cc` is missing, unless
+`PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS=1` makes that an error. No project configuration is
 provided for [Ruff] or [ty]; a `noqa: BLE001` comment explains each deliberate
-broad `except`. CI currently builds and checks
-the watch bundle but runs neither the suite nor these checks. See the [task
+broad `except`. The [CI workflow] runs the suite on Python 3.11 with Node 24 and
+that setting for every pull request and push to `main`, beside the watch bundle
+build and checks. Release creation and publishing wait for both to pass. CI does
+not run Ruff or ty. See the [task
 tracker] for completed work and unverified proposals, and the [documentation
 review] for this source check's findings. Live deployment and installed Codex CLI
 compatibility were not verified by that check.
 
+[CI workflow]: .github/workflows/build.yml
 [collector guide]: docs/collector.md
 [GitHub releases]: https://github.com/akaihola/pebble-quota/releases/latest
 [watchface guide]: watchface/README.md

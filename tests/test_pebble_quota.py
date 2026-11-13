@@ -35,6 +35,8 @@ class LiveAccessError(BaseException):
 
 
 _TOOL_PATH = os.environ["PATH"]
+# CI sets this so that a missing node or cc fails the watch tests instead of skipping them.
+_REQUIRE_WATCH_TOOLS = os.environ.get("PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS") == "1"
 _REAL_POPEN = subprocess.Popen
 
 
@@ -755,6 +757,22 @@ class CollectAllTemperatureTests(unittest.TestCase):
         self.assertNotIn("t", quota.compact_watch(data, now=0))
 
 
+# Acceptance matrix for provider percentages: (provider percent, used_fraction,
+# compact "u", compact "p" half way through a 5h window). 1% must stay 1%, not
+# 100% (fixes 9fff907 for Codex and 5001e41 for Claude).
+PERCENT_CASES = ((0, 0.0, 0, 50), (.5, .005, 0, 50), (1, .01, 1, 49), (2, .02, 2, 48),
+                 (100, 1.0, 100, -50))
+PERCENT_RESET = 1_800_018_000
+PERCENT_HALF_WAY = PERCENT_RESET - 9_000
+
+
+def percent_rows(service: dict[str, Any]) -> list[tuple[int, int]]:
+    """(u, p) of each watch row of one provider, half way through its window."""
+    name = "codex" if service.get("service") == "codex" else "claude"
+    compact = quota.compact_watch({"services": {name: service}}, now=PERCENT_HALF_WAY)
+    return [(row["u"], row["p"]) for row in compact["q"]]
+
+
 class ClaudeCollectTests(unittest.TestCase):
     LIMITS: ClassVar[list[dict[str, Any]]] = [
         {"kind": "session", "percent": 5,
@@ -802,26 +820,23 @@ class ClaudeCollectTests(unittest.TestCase):
         })
         self.assertNotIn("private", json.dumps(service))
 
-    def test_limits_percentages(self) -> None:
-        for percent, expected in ((0, 0.0), (1, 0.01), (100, 1.0)):
-            with self.subTest(percent=percent):
-                result = self._collect({"limits": [
-                    {**limit, "percent": percent} for limit in self.LIMITS
-                ]})
-                self.assertEqual(set(result["windows"]), {"5h", "7d", "7d (Fable)"})
-                for window in result["windows"].values():
-                    self.assertEqual(window["used_fraction"], expected)
-
-    def test_legacy_percentages(self) -> None:
-        for percent, expected in ((0, 0.0), (1, 0.01), (100, 1.0)):
-            with self.subTest(percent=percent):
-                result = self._collect({
-                    name: {"utilization": percent, "resets_at": "2026-08-10T12:00:00+00:00"}
-                    for name in ("five_hour", "seven_day")
-                })
-                self.assertEqual(set(result["windows"]), {"5h", "7d"})
-                for window in result["windows"].values():
-                    self.assertEqual(window["used_fraction"], expected)
+    def test_both_payload_formats_convert_percentages(self) -> None:
+        adapters = {
+            "limits": lambda usage: {"limits": [{"kind": "session", "scope": None,
+                                                 "resets_at": quota.iso_from_epoch(PERCENT_RESET),
+                                                 **usage}]},
+            "legacy": lambda usage: {"five_hour": {"resets_at": quota.iso_from_epoch(PERCENT_RESET),
+                                                   **usage}},
+        }
+        field = {"limits": "percent", "legacy": "utilization"}
+        for adapter, payload in adapters.items():
+            for percent, fraction, used, pace in PERCENT_CASES:
+                with self.subTest(adapter=adapter, percent=percent):
+                    service = self._collect(payload({field[adapter]: percent}))
+                    self.assertEqual(service["windows"]["5h"]["used_fraction"], fraction)
+                    self.assertEqual(percent_rows(service), [(used, pace)])
+            with self.subTest(adapter=adapter, percent="missing"):
+                self.assertEqual(percent_rows(self._collect(payload({}))), [])
 
     def test_limits_are_preferred_and_include_fable(self) -> None:
         result = self._collect({
@@ -928,6 +943,13 @@ class SecurityTests(unittest.TestCase):
                 "from pathlib import Path\n"
                 "Path(sys.argv[1] + '.json').write_text(json.dumps(dict(os.environ)))\n")
             fake.chmod(0o700)
+            # An active SDK in the test home keeps make from installing one first.
+            sdk = root / ".local/share/pebble-sdk/SDKs/current"
+            compiler = sdk / "toolchain/arm-none-eabi/bin/arm-none-eabi-gcc"
+            compiler.parent.mkdir(parents=True)
+            compiler.touch(mode=0o700)
+            (sdk / "sdk-core/pebble").mkdir(parents=True)
+            (sdk / "sdk-core/pebble/waf").touch()
             makefile = Path(__file__).parents[1] / "watchface/Makefile"
             env = {"HOME": directory, "PATH": directory + os.pathsep + _TOOL_PATH,
                    "LANG": "C.UTF-8", "HASS_TOKEN": "fake", "BUILD_API_KEY": "fake"}
@@ -1454,6 +1476,18 @@ class CodexRPCTests(unittest.TestCase):
         self.assertEqual(data["windows"]["5h"]["used_fraction"], .01)
         self.assertEqual(quota.compact_watch({"services": {"codex": data}}, now=1000)["q"][0]["u"], 1)
 
+    def test_percentages_through_the_fake_app_server(self):
+        window = {"resetsAt": PERCENT_RESET, "windowDurationMins": 300}
+        for percent, fraction, used, pace in PERCENT_CASES:
+            with self.subTest(percent=percent), self.server(self.replies(
+                    {"rateLimits": {"primary": dict(window, usedPercent=percent)}})):
+                service = quota.collect_codex()
+                self.assertEqual(service["windows"]["5h"]["used_fraction"], fraction)
+                self.assertEqual(percent_rows(service), [(used, pace)])
+        with self.subTest(percent="missing"):
+            self.assert_failure(self.replies({"rateLimits": {"primary": window}}),
+                                "Codex rate limits: invalid result")
+
     def test_both_rpc_errors_are_sanitized_and_other_rows_survive(self):
         error = {"code": -32000, "message": "fixture-only", "data": "fixture-only"}
         for request_id, stage in ((1, "initialize"), (2, "rate limits")):
@@ -1604,6 +1638,8 @@ class WatchTools(unittest.TestCase):
     def setUpClass(cls) -> None:
         node, cc = shutil.which("node", path=_TOOL_PATH), shutil.which("cc", path=_TOOL_PATH)
         if not node or not cc:
+            if _REQUIRE_WATCH_TOOLS:
+                raise RuntimeError("PEBBLE_QUOTA_REQUIRE_WATCH_TOOLS=1 but node or cc is missing")
             raise unittest.SkipTest("needs node and a C compiler on PATH")
         cls.node = node
         cls.driver = Path(cls.enterClassContext(tempfile.TemporaryDirectory())) / "gauges"
