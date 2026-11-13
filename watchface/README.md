@@ -62,10 +62,19 @@ The [watchface build recipe] selects the ARM compiler from the locally active Pe
 directly on the documented NixOS host may instead select its host compiler
 wrapper.
 
-The [CI workflow] pins Python 3.12.3, Node 24, Pebble tool 5.0.40 and SDK 4.33.1;
-the recipe itself does not pin an SDK version. A local build needs the Pebble
-CLI on `PATH` and an installed active SDK/toolchain. Output is the
-[installable bundle].
+The [CI workflow] pins Python 3.12.3, Node 24, Pebble tool 5.0.40 and SDK 4.33.1.
+A local build needs the Pebble CLI, `npm` and Node on `PATH`. When no SDK is
+active, `make build` and `make clean` first run `pebble sdk install` for
+`PEBBLE_SDK_VERSION` (default 4.33.1, the CI version). It downloads from
+`sdk.repebble.com`, PyPI and npm and uses about 800 MB of disk. Installing it
+means accepting the Pebble terms of use and SDK license that the command prints.
+If the installation fails, make stops with an error before cleaning or building,
+so an earlier bundle stays in place. An already active SDK of another version is
+used as is. Output is the [installable bundle].
+
+To free the disk again, `pebble sdk uninstall <version>` removes the SDK files
+and the `SDKs/current` link. Emulator storage in `pebble-sdk/<version>/` and the
+tool's settings stay.
 
 ## Emulator screenshot
 
