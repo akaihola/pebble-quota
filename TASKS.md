@@ -17,10 +17,10 @@ Rules for TASKS.md usage are at the bottom of the file.
 
 ## Ordered backlog
 
-- [33] Install the Pebble SDK automatically when a watchface build needs it
-  <!-- hai:{"id":"simple-d1eb6ffb-8b84-4315-ae0f-fe2fd87f2d25","createdAt":"2026-11-13T15:31:28.725Z","updatedAt":"2026-11-13T15:31:28.725Z"} -->
-
 ## Scheduled
+
+- [33] Install the Pebble SDK automatically when a watchface build needs it
+  <!-- hai:{"id":"simple-d1eb6ffb-8b84-4315-ae0f-fe2fd87f2d25","createdAt":"2026-11-13T15:31:28.725Z","updatedAt":"2026-11-13T15:33:05.132Z"} -->
 
 ## In Progress
 
